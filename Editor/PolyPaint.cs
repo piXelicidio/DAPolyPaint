@@ -26,13 +26,14 @@ namespace DAPolyPaint
         int _lastFace;
         Vector2 _lastUVpick = new Vector2(0.5f, 0.5f);
         Vector2 _lastInTextureMousePos;
-
+        private Vector2 _scrollPos;
         const float _statusColorBarHeight = 3;
 
         [MenuItem("DA-Tools/Poly Paint")]
         public static void ShowWindow()
         {
-            EditorWindow.GetWindow(typeof(PolyPaint));
+            var ew  = EditorWindow.GetWindow(typeof(PolyPaint));
+            ew.titleContent = new GUIContent("Poly Paint");
         }
 
         public void CreateGUI()
@@ -47,6 +48,7 @@ namespace DAPolyPaint
 
         void OnGUI()
         {
+            _scrollPos = EGL.BeginScrollView(_scrollPos);
             using (new EditorGUI.DisabledScope(_targetMesh == null))
             {
                 if (!_paintingMode)
@@ -82,10 +84,19 @@ namespace DAPolyPaint
             
             _objectInfo = EGL.BeginFoldoutHeaderGroup(_objectInfo, s);
             if (_objectInfo)
-            {   
-                var mt = MessageType.Info;
-                if (!check.isOk) mt = MessageType.Warning;
-                EGL.HelpBox(check.info, mt);
+            {
+                if (check.isOk)
+                {
+                    EGL.HelpBox(check.info, MessageType.None);
+                } else {
+                    EGL.HelpBox(check.info, MessageType.Warning);
+                    //var r = GUILayoutUtility.GetLastRect();
+                    //EditorGUIUtility.rect
+                    //Debug.Log(r.ToString());                    
+                    //EditorGUI.DrawRect(statusColorRect, statusColor);
+                }
+
+                
             }
             EGL.EndFoldoutHeaderGroup();
 
@@ -121,7 +132,7 @@ namespace DAPolyPaint
 
 
             EGL.LabelField(_lastUVpick.ToString());
-
+            EGL.EndScrollView();
         }
 
         private (bool isOk, string info) CheckObject()
