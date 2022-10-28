@@ -18,6 +18,7 @@ namespace DAPolyPaint
 
         GameObject _targetObject;
         Mesh _targetMesh;
+        private bool _skinned;
         Texture _targetTexture;
         List<Vector2> _targetMeshUVs;
         Vector3 _currMousePosCam;
@@ -46,6 +47,7 @@ namespace DAPolyPaint
             SceneView.duringSceneGui -= OnScene;
         }
 
+        //Editor Window User Interface - PolyPaint --------------------------------
         void OnGUI()
         {
             _scrollPos = EGL.BeginScrollView(_scrollPos);
@@ -55,8 +57,9 @@ namespace DAPolyPaint
                 {
                     if (GUILayout.Button("START PAINT MODE"))
                     {
-                        PrepareObject(_targetObject);
+                        PrepareObject();
                         _paintingMode = true;
+                        SceneView.lastActiveSceneView.Repaint();
                     }
                 }
                 else
@@ -64,6 +67,7 @@ namespace DAPolyPaint
                     if (GUILayout.Button("STOP PAINT MODE"))
                     {
                         _paintingMode = false;
+                        SceneView.lastActiveSceneView.Repaint();
                     }
                 }
             }
@@ -144,8 +148,12 @@ namespace DAPolyPaint
             info += "Mesh: " + s;
             if (_targetTexture == null) { s = "NOT FOUND"; isOk = false; } else s = _targetTexture.name;
             info += "\nTex: " + s;
-            info += "\nFace: " + _lastFace.ToString();
-            info += "\nSetUVs calls: " + _setUVcalls.ToString();
+            if (isOk)
+            {
+                info += "\nFace: " + _lastFace.ToString();
+                info += "\nSetUVs calls: " + _setUVcalls.ToString();
+                info += "\nSkinned: " + _skinned.ToString();
+            }
             return (isOk, info);
         }
 
@@ -231,10 +239,50 @@ namespace DAPolyPaint
             return result;
         }
 
+        void EditorGUIDrawFrame(string label, int border = 2)
+        {            
+            var width = Camera.current.pixelWidth;
+            var height = Camera.current.pixelHeight;
+            var rt = new Rect(0, 0, width, border);
+            Color c = Color.red;
+            EditorGUI.DrawRect(rt, c);
+            rt.height = height;
+            rt.width = border;
+            EditorGUI.DrawRect(rt, c);
+            rt.x = width - border;
+            EditorGUI.DrawRect(rt, c);
+            rt.x = 0;
+            rt.y = height - border;
+            rt.height = border;
+            rt.width = width;
+            EditorGUI.DrawRect(rt, c);
+
+            //label
+            rt.width = 200;
+            rt.height = EditorGUIUtility.singleLineHeight; 
+            rt.x = border*2; 
+            rt.y = height - EditorGUIUtility.singleLineHeight - border*2;
+            var style = new GUIStyle(EditorStyles.label);
+            style.fontSize += 2;
+            style.normal.textColor = Color.black;
+            EditorGUI.LabelField(rt, label, style);
+            rt.x -= 1;
+            rt.y -= 1;
+            style.normal.textColor = Color.red;
+            EditorGUI.LabelField(rt, label, style);
+        }
+
+        //Current Editor scene events and draw
         void OnScene(SceneView scene)
         {
             if (_paintingMode)
             {
+                //draw
+                Handles.BeginGUI();
+                EditorGUIDrawFrame("PAINT MODE");
+                Handles.EndGUI();
+
+                //input events
                 int id = GUIUtility.GetControlID(0xDA3D, FocusType.Passive);
                 var ev = Event.current;
                 //consume input except when doing navigation, view rotation, panning..
@@ -243,7 +291,7 @@ namespace DAPolyPaint
                 if (ev.type == EventType.MouseDrag)
                 {
                     var prevFace = _lastFace;
-                    _lastFace = GetFaceHit(SceneView.lastActiveSceneView, ev.mousePosition);
+                    _lastFace = GetFaceHit(scene, ev.mousePosition);
                     if (_lastFace != prevFace)
                     {
                         if (_isPressed) PaintUV(_lastFace, _lastUVpick);
@@ -256,7 +304,7 @@ namespace DAPolyPaint
                     _isPressed = true;
                     if (_targetMesh != null)
                     {
-                        _lastFace = GetFaceHit(SceneView.lastActiveSceneView, ev.mousePosition);
+                        _lastFace = GetFaceHit(scene, ev.mousePosition);
                         PaintUV(_lastFace, _lastUVpick);
                         Repaint();
                     }
@@ -266,23 +314,33 @@ namespace DAPolyPaint
                     ReleaseInput(ev);
                     _isPressed = false;
                 }
+
+                
             }
         }
 
         void OnSelectionChange()
         {
             _targetObject = Selection.activeGameObject;
+            _skinned = false;
             if (_targetObject != null)
             {
-                var mf = _targetObject.GetComponent<MeshFilter>();
-                if (mf != null)
+                var solid = _targetObject.GetComponent<MeshFilter>();
+                var skinned = _targetObject.GetComponent<SkinnedMeshRenderer>();
+                if (solid != null)
                 {
-                    _targetMesh = mf.sharedMesh;
+                    _targetMesh = solid.sharedMesh;
                 }
+                else if (skinned != null)
+                {
+                    _targetMesh = skinned.sharedMesh;
+                    _skinned = true;
+                } 
                 else
                 {
                     _targetMesh = null;
                 }
+                
                 var r = _targetObject.GetComponent<Renderer>();
                 if (r != null)
                 {
@@ -301,39 +359,48 @@ namespace DAPolyPaint
             Repaint();
         }
 
-        void PrepareObject(GameObject obj)
-        {
-            var meshFilter = obj.GetComponent<MeshFilter>();
-            if (meshFilter != null)
+        void PrepareObject()
+        {            
+            if (_targetMesh != null)
             {
-                var m = meshFilter.sharedMesh;
-                LogMeshInfo(m);
-                RebuildMeshForPainting(m);
+                LogMeshInfo(_targetMesh);
+                RebuildMeshForPainting();
                 //
-                if (!obj.GetComponent<MeshCollider>()) obj.AddComponent<MeshCollider>();
+                if (!_targetObject.GetComponent<MeshCollider>()) _targetObject.AddComponent<MeshCollider>();
+            } else
+            {
+                Debug.LogWarning("_targetMeshs should be valid before calling PrepareObject()");
             }
         }
 
-        void RebuildMeshForPainting(Mesh m)
+        void RebuildMeshForPainting()
         {
+            var m = _targetMesh;
             var tris = m.triangles;
             var vertices = m.vertices;
             var UVs = m.uv;
             var normals = m.normals;
+            var boneWeights = m.boneWeights;
             var newVertices = new List<Vector3>();
             var newUVs = new List<Vector2>();
             var newTris = new List<int>();
             var newNormals = new List<Vector3>();
+            var newBW = new BoneWeight[tris.Length];
             //no more shared vertices, each triangle will have its own 3 vertices.
             for (int i = 0; i < tris.Length; i++)
             {
                 var idx = tris[i];
+                newTris.Add(i);
                 newVertices.Add(vertices[idx]);
-                newNormals.Add(normals[idx]);
+                newNormals.Add(normals[idx]);                
                 //also UVs but the 3 values will be the same
                 newUVs.Add(UVs[tris[i - i % 3]]);
-                //newUVs.Add(new Vector2(0.82f, 0.1f));
-                newTris.Add(i);
+                
+                if (_skinned)
+                {
+                    newBW[i] = boneWeights[idx];
+                }
+                
             }
             //TODO: assign new data, recarculate normals:
             if (m.subMeshCount > 1) m.subMeshCount = 1;
@@ -342,7 +409,12 @@ namespace DAPolyPaint
             _targetMeshUVs = newUVs; //keep ref for painting
             m.SetTriangles(newTris, 0);
             m.SetNormals(newNormals);
-            //m.RecalculateNormals();
+           
+            if (_skinned)
+            {
+                //TODO(maybe later): Use the more complex new SetBoneWeights to support more than 4 bones per vertex
+                m.boneWeights = newBW;
+            }
         }
 
         void LogMeshInfo(Mesh m)
@@ -352,6 +424,7 @@ namespace DAPolyPaint
             s = s + " - Triangles: " + (m.triangles.Length / 3);
             s = s + " - Vertices: " + m.vertices.Length;
             s = s + " - UVs: " + m.uv.Length;
+            s = s + " - Bones: " + m.bindposes.Length;
             Debug.Log(s);
         }
     }
