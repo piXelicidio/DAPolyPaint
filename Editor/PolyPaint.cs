@@ -28,6 +28,7 @@ namespace DAPolyPaint
         Vector2 _lastUVpick = new Vector2(0.5f, 0.5f);
         Vector2 _lastInTextureMousePos;
         private Vector2 _scrollPos;
+        private MeshCollider _meshCollider;
         const float _statusColorBarHeight = 3;
 
         [MenuItem("DA-Tools/Poly Paint")]
@@ -40,6 +41,7 @@ namespace DAPolyPaint
         public void CreateGUI()
         {
             SceneView.duringSceneGui += OnScene;
+            this.OnSelectionChange();
         }
 
         public void OnDestroy()
@@ -227,13 +229,16 @@ namespace DAPolyPaint
                 _currMousePosCam.y = sv.camera.pixelHeight - _currMousePosCam.y;
                 var ray = sv.camera.ScreenPointToRay(_currMousePosCam);
 
-                var coll = _targetObject.GetComponent<Collider>();
+                var coll = _targetObject.GetComponent<MeshCollider>();
                 if (coll)
                 {
                     if (coll.Raycast(ray, out _lastHit, 100f))
                     {
                         result = _lastHit.triangleIndex;
                     }
+                } else
+                {
+                    Debug.LogWarning("No collider to do raycast.");
                 }
             }
             return result;
@@ -363,10 +368,21 @@ namespace DAPolyPaint
         {            
             if (_targetMesh != null)
             {
-                LogMeshInfo(_targetMesh);
+                LogMeshInfo(_targetMesh);                
                 RebuildMeshForPainting();
-                //
-                if (!_targetObject.GetComponent<MeshCollider>()) _targetObject.AddComponent<MeshCollider>();
+                if (!_targetObject.GetComponent<MeshCollider>())
+                {
+                    _meshCollider = _targetObject.AddComponent<MeshCollider>();
+                    if (!_skinned) _meshCollider.sharedMesh = _targetMesh;
+                    else
+                    {
+                        //snapshoting the skinned mesh so we can paint over a mesh distorted by bone transformations.
+                        var smr = _targetObject.GetComponent<SkinnedMeshRenderer>();
+                        var snapshot = new Mesh();
+                        smr.BakeMesh(snapshot, true);
+                        _meshCollider.sharedMesh = snapshot;                        
+                    }
+                }
             } else
             {
                 Debug.LogWarning("_targetMeshs should be valid before calling PrepareObject()");
