@@ -9,8 +9,10 @@ using System;
 namespace DAPolyPaint
 {
 
-    public class PolyPaint : EditorWindow
+    public class PolyPaintWindow : EditorWindow
     {
+        Painter _painter;
+
         bool _paintingMode;
         bool _objectInfo = true;
         int _setUVcalls = 0;
@@ -29,17 +31,18 @@ namespace DAPolyPaint
         Vector2 _lastInTextureMousePos;
         private Vector2 _scrollPos;
         private MeshCollider _meshCollider;
-        const float _statusColorBarHeight = 3;
+        const float _statusColorBarHeight = 3; 
 
         [MenuItem("DA-Tools/Poly Paint")]
         public static void ShowWindow()
         {
-            var ew  = EditorWindow.GetWindow(typeof(PolyPaint));
-            ew.titleContent = new GUIContent("Poly Paint");
+            var ew  = EditorWindow.GetWindow(typeof(PolyPaintWindow));
+            ew.titleContent = new GUIContent("Poly Paint");            
         }
 
         public void CreateGUI()
         {
+            _painter = new Painter();
             SceneView.duringSceneGui += OnScene;
             this.OnSelectionChange();
         }
@@ -207,18 +210,6 @@ namespace DAPolyPaint
             EditorGUIUtility.SetWantsMouseJumping(0);
         }
 
-        void PaintUV(int face, Vector2 uvc)
-        {
-            if (face >= 0)
-            {
-                _targetMeshUVs[face * 3] = uvc;
-                _targetMeshUVs[face * 3 + 1] = uvc;
-                _targetMeshUVs[face * 3 + 2] = uvc;
-                _targetMesh.SetUVs(0, _targetMeshUVs);  //could be improved if Start, Length parameters actually worked
-                _setUVcalls++;
-            }
-        }
-
         int GetFaceHit(SceneView sv, Vector2 currMousePos)
         {
             int result = -1;
@@ -299,7 +290,7 @@ namespace DAPolyPaint
                     _lastFace = GetFaceHit(scene, ev.mousePosition);
                     if (_lastFace != prevFace)
                     {
-                        if (_isPressed) PaintUV(_lastFace, _lastUVpick);
+                        if (_isPressed) _painter.SetUV(_lastFace, _lastUVpick);
                         Repaint();
                     }
                 }
@@ -310,7 +301,7 @@ namespace DAPolyPaint
                     if (_targetMesh != null)
                     {
                         _lastFace = GetFaceHit(scene, ev.mousePosition);
-                        PaintUV(_lastFace, _lastUVpick);
+                        _painter.SetUV(_lastFace, _lastUVpick);
                         Repaint();
                     }
                 }
@@ -319,7 +310,10 @@ namespace DAPolyPaint
                     ReleaseInput(ev);
                     _isPressed = false;
                 }
-
+                else if (ev.type == EventType.MouseMove)
+                {
+                    
+                }
                 
             }
         }
@@ -368,68 +362,31 @@ namespace DAPolyPaint
         {            
             if (_targetMesh != null)
             {
-                LogMeshInfo(_targetMesh);                
-                RebuildMeshForPainting();
+                LogMeshInfo(_targetMesh);
+                _painter.SetMesh(_targetMesh, _skinned);
                 if (!_targetObject.GetComponent<MeshCollider>())
                 {
                     _meshCollider = _targetObject.AddComponent<MeshCollider>();
-                    if (!_skinned) _meshCollider.sharedMesh = _targetMesh;
+                    if (!_skinned)
+                    {
+                       _meshCollider.sharedMesh = _targetMesh;
+                      // _targetMesh.GetVertices(_colliderMeshVertices);
+                       
+                    }
+
                     else
                     {
                         //snapshoting the skinned mesh so we can paint over a mesh distorted by bone transformations.
                         var smr = _targetObject.GetComponent<SkinnedMeshRenderer>();
                         var snapshot = new Mesh();
                         smr.BakeMesh(snapshot, true);
-                        _meshCollider.sharedMesh = snapshot;                        
+                        _meshCollider.sharedMesh = snapshot;
+                        
                     }
                 }
             } else
             {
                 Debug.LogWarning("_targetMeshs should be valid before calling PrepareObject()");
-            }
-        }
-
-        void RebuildMeshForPainting()
-        {
-            var m = _targetMesh;
-            var tris = m.triangles;
-            var vertices = m.vertices;
-            var UVs = m.uv;
-            var normals = m.normals;
-            var boneWeights = m.boneWeights;
-            var newVertices = new List<Vector3>();
-            var newUVs = new List<Vector2>();
-            var newTris = new List<int>();
-            var newNormals = new List<Vector3>();
-            var newBW = new BoneWeight[tris.Length];
-            //no more shared vertices, each triangle will have its own 3 vertices.
-            for (int i = 0; i < tris.Length; i++)
-            {
-                var idx = tris[i];
-                newTris.Add(i);
-                newVertices.Add(vertices[idx]);
-                newNormals.Add(normals[idx]);                
-                //also UVs but the 3 values will be the same
-                newUVs.Add(UVs[tris[i - i % 3]]);
-                
-                if (_skinned)
-                {
-                    newBW[i] = boneWeights[idx];
-                }
-                
-            }
-            //TODO: assign new data, recarculate normals:
-            if (m.subMeshCount > 1) m.subMeshCount = 1;
-            m.SetVertices(newVertices);
-            m.SetUVs(0, newUVs);
-            _targetMeshUVs = newUVs; //keep ref for painting
-            m.SetTriangles(newTris, 0);
-            m.SetNormals(newNormals);
-           
-            if (_skinned)
-            {
-                //TODO(maybe later): Use the more complex new SetBoneWeights to support more than 4 bones per vertex
-                m.boneWeights = newBW;
             }
         }
 
@@ -443,6 +400,8 @@ namespace DAPolyPaint
             s = s + " - Bones: " + m.bindposes.Length;
             Debug.Log(s);
         }
+
+
     }
 
 }
