@@ -4,7 +4,7 @@ using UnityEngine;
 using UnityEditor;
 using EGL = UnityEditor.EditorGUILayout;
 using System;
-
+using System.Linq;
 
 namespace DAPolyPaint
 {
@@ -15,20 +15,17 @@ namespace DAPolyPaint
 
         bool _paintingMode;
         bool _objectInfo = true;
-        int _setUVcalls = 0;
         bool _isPressed = false;
 
         GameObject _targetObject;
         Mesh _targetMesh;
         private bool _skinned;
         Texture _targetTexture;
-        List<Vector2> _targetMeshUVs;
         Vector3 _currMousePosCam;
 
         RaycastHit _lastHit;
         int _lastFace;
-        Vector2 _lastUVpick = new Vector2(0.5f, 0.5f);
-        Vector2 _lastInTextureMousePos;
+        Vector2 _lastUVpick;
         private Vector2 _scrollPos;
         private MeshCollider _meshCollider;
         const float _statusColorBarHeight = 3; 
@@ -43,13 +40,13 @@ namespace DAPolyPaint
         public void CreateGUI()
         {
             _painter = new Painter();
-            SceneView.duringSceneGui += OnScene;
+            SceneView.duringSceneGui += OnSceneGUI;
             this.OnSelectionChange();
         }
 
         public void OnDestroy()
         {
-            SceneView.duringSceneGui -= OnScene;
+            SceneView.duringSceneGui -= OnSceneGUI;
         }
 
         //Editor Window User Interface - PolyPaint --------------------------------
@@ -137,11 +134,15 @@ namespace DAPolyPaint
                     }
                 }
             }
-
-
-
             EGL.LabelField(_lastUVpick.ToString());
+
+            using (new EditorGUI.DisabledScope(!_paintingMode))
+            {
+                if (GUILayout.Button("Full Repaint")) _painter.FullRepaint(_lastUVpick);
+            }
+            
             EGL.EndScrollView();
+
         }
 
         private (bool isOk, string info) CheckObject()
@@ -156,7 +157,7 @@ namespace DAPolyPaint
             if (isOk)
             {
                 info += "\nFace: " + _lastFace.ToString();
-                info += "\nSetUVs calls: " + _setUVcalls.ToString();
+                info += "\nSetUVs calls: " + _painter.NumUVCalls.ToString();
                 info += "\nSkinned: " + _skinned.ToString();
             }
             return (isOk, info);
@@ -269,30 +270,40 @@ namespace DAPolyPaint
         }
 
         //Current Editor scene events and draw
-        void OnScene(SceneView scene)
+        void OnSceneGUI(SceneView scene)
         {
             if (_paintingMode)
             {
-                //draw
-                Handles.BeginGUI();
-                EditorGUIDrawFrame("PAINT MODE");
-                Handles.EndGUI();
+
 
                 //input events
                 int id = GUIUtility.GetControlID(0xDA3D, FocusType.Passive);
                 var ev = Event.current;
                 //consume input except when doing navigation, view rotation, panning..
-                if (ev.alt || ev.button > 0)  return;                
+                if (ev.alt || ev.button > 0) return;
 
-                if (ev.type == EventType.MouseDrag)
+                //draw                               
+                Handles.BeginGUI();
+                EditorGUIDrawFrame("PAINT MODE");
+                if (_lastFace > 0) DrawFaceCursor();
+                Handles.EndGUI();
+
+                if (ev.type == EventType.MouseDrag )
                 {
                     var prevFace = _lastFace;
                     _lastFace = GetFaceHit(scene, ev.mousePosition);
+                    
                     if (_lastFace != prevFace)
                     {
-                        if (_isPressed) _painter.SetUV(_lastFace, _lastUVpick);
-                        Repaint();
-                    }
+                        if (_isPressed) _painter.SetUV(_lastFace, _lastUVpick);                            
+                    }                    
+                    this.Repaint();                    
+                } 
+                else if (ev.type == EventType.MouseMove)
+                {                    
+                    _lastFace = GetFaceHit(scene, ev.mousePosition);
+                    this.Repaint();
+                    //scene.Repaint();
                 }
                 else if (ev.type == EventType.MouseDown)
                 {
@@ -310,11 +321,28 @@ namespace DAPolyPaint
                     ReleaseInput(ev);
                     _isPressed = false;
                 }
-                else if (ev.type == EventType.MouseMove)
+
+            }
+        }
+
+        private void DrawFaceCursor()
+        {
+            var verts = new List<Vector3>();            
+            _painter.GetFaceVerts(_lastFace, verts);
+            if (verts.Count > 0)
+            {
+                verts.Add(verts[0]);
+                var mat = _targetObject.transform.localToWorldMatrix;
+                for (int i = 0; i < verts.Count; i++)
                 {
-                    
+                    verts[i] = mat.MultiplyPoint3x4(verts[i]);
                 }
-                
+
+                for (int i = 0; i < verts.Count - 1; i++)
+                {
+                    //Debug.DrawLine(verts[i], verts[i+1]);
+                    Handles.DrawLine(verts[i], verts[i + 1]);
+                }
             }
         }
 
@@ -363,27 +391,23 @@ namespace DAPolyPaint
             if (_targetMesh != null)
             {
                 LogMeshInfo(_targetMesh);
-                _painter.SetMesh(_targetMesh, _skinned);
-                if (!_targetObject.GetComponent<MeshCollider>())
+                _painter.SetMeshAndRebuild(_targetMesh, _skinned);
+                _meshCollider = _targetObject.GetComponent<MeshCollider>();
+                if (_meshCollider == null) _meshCollider = _targetObject.AddComponent<MeshCollider>();                
+                if (!_skinned)
                 {
-                    _meshCollider = _targetObject.AddComponent<MeshCollider>();
-                    if (!_skinned)
-                    {
-                       _meshCollider.sharedMesh = _targetMesh;
-                      // _targetMesh.GetVertices(_colliderMeshVertices);
-                       
-                    }
-
-                    else
-                    {
-                        //snapshoting the skinned mesh so we can paint over a mesh distorted by bone transformations.
-                        var smr = _targetObject.GetComponent<SkinnedMeshRenderer>();
-                        var snapshot = new Mesh();
-                        smr.BakeMesh(snapshot, true);
-                        _meshCollider.sharedMesh = snapshot;
-                        
-                    }
+                    _meshCollider.sharedMesh = _targetMesh;                  
                 }
+                else
+                {
+                    //snapshoting the skinned mesh so we can paint over a mesh distorted by bone transformations.
+                    var smr = _targetObject.GetComponent<SkinnedMeshRenderer>();
+                    var snapshot = new Mesh();
+                    smr.BakeMesh(snapshot, true);
+                    _meshCollider.sharedMesh = snapshot;
+                }
+                _lastFace = -1;
+                
             } else
             {
                 Debug.LogWarning("_targetMeshs should be valid before calling PrepareObject()");
