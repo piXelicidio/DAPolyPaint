@@ -21,11 +21,14 @@ namespace DAPolyPaint
         Mesh _targetMesh;
         private bool _skinned;
         Texture _targetTexture;
+        Texture2D _textureData;
         Vector3 _currMousePosCam;
 
         RaycastHit _lastHit;
         int _lastFace;
+        private Paint _paint;
         Vector2 _lastUVpick;
+        private Color _lastPixelColor;
         private Vector2 _scrollPos;
         private MeshCollider _meshCollider;
         const float _statusColorBarHeight = 3; 
@@ -62,6 +65,7 @@ namespace DAPolyPaint
                         PrepareObject();
                         _paintingMode = true;
                         SceneView.lastActiveSceneView.Repaint();
+                        PaintEditor.PaintMode = true;
                     }
                 }
                 else
@@ -70,6 +74,7 @@ namespace DAPolyPaint
                     {
                         _paintingMode = false;
                         SceneView.lastActiveSceneView.Repaint();
+                        PaintEditor.PaintMode = false;
                     }
                 }
             }
@@ -110,6 +115,7 @@ namespace DAPolyPaint
             if (_targetTexture)
             {
                 var currWidth = EditorGUIUtility.currentViewWidth;
+                
                 var rt = EGL.GetControlRect(false, currWidth);
                 rt.height = rt.width;
                 EditorGUI.DrawPreviewTexture(rt, _targetTexture);
@@ -129,15 +135,28 @@ namespace DAPolyPaint
                         mousePos.y /= rt.height;
                         mousePos.y = 1 - mousePos.y;
                         _lastUVpick = mousePos;
-                        //_targetTexture.
+
+                        _lastPixelColor = _textureData.GetPixel((int) (mousePos.x * _textureData.width), (int) (mousePos.y * _textureData.height));
+                        PaintEditor.SetPixelColor(_lastPixelColor);
+
                         Repaint();
                     }
                 }
+
+                var cRect = EGL.GetControlRect(false, EditorGUIUtility.singleLineHeight);
+                cRect.width = cRect.width / 2;
+                cRect.x += cRect.width;
+                EditorGUI.LabelField(cRect, _lastUVpick.ToString());
+                cRect.x = cRect.width - cRect.height;
+                cRect.width = cRect.height;                
+                EditorGUI.DrawRect(cRect, _lastPixelColor);
             }
-            EGL.LabelField(_lastUVpick.ToString());
+
+            
 
             using (new EditorGUI.DisabledScope(!_paintingMode))
             {
+                EGL.Space();
                 if (GUILayout.Button("Full Repaint")) _painter.FullRepaint(_lastUVpick);
             }
             
@@ -284,8 +303,7 @@ namespace DAPolyPaint
 
                 //draw                               
                 Handles.BeginGUI();
-                EditorGUIDrawFrame("PAINT MODE");
-                if (_lastFace > 0) DrawFaceCursor();
+                EditorGUIDrawFrame("PAINT MODE");                
                 Handles.EndGUI();
 
                 if (ev.type == EventType.MouseDrag )
@@ -295,31 +313,39 @@ namespace DAPolyPaint
                     
                     if (_lastFace != prevFace)
                     {
-                        if (_isPressed) _painter.SetUV(_lastFace, _lastUVpick);                            
+                        if (_isPressed) _painter.SetUV(_lastFace, _lastUVpick);
+                        _painter.GetFaceVerts(_lastFace, PaintEditor.PolyCursor, _targetObject.transform.localToWorldMatrix);
                     }                    
                     this.Repaint();                    
                 } 
                 else if (ev.type == EventType.MouseMove)
-                {                    
+                {
+                    var prevFace = _lastFace;
                     _lastFace = GetFaceHit(scene, ev.mousePosition);
-                    this.Repaint();
-                    //scene.Repaint();
+                    if (_lastFace != prevFace)
+                    {
+                        _painter.GetFaceVerts(_lastFace, PaintEditor.PolyCursor, _targetObject.transform.localToWorldMatrix);
+                        //SceneView.RepaintAll();
+                        scene.Repaint();
+                        //Repaint();
+                    }                    
                 }
                 else if (ev.type == EventType.MouseDown)
                 {
                     AcquireInput(ev, id);
-                    _isPressed = true;
+                    _isPressed = true;                    
                     if (_targetMesh != null)
-                    {
+                    {                        
                         _lastFace = GetFaceHit(scene, ev.mousePosition);
                         _painter.SetUV(_lastFace, _lastUVpick);
+                        _painter.GetFaceVerts(_lastFace, PaintEditor.PolyCursor, _targetObject.transform.localToWorldMatrix);
                         Repaint();
                     }
                 }
                 else if (ev.type == EventType.MouseUp)
                 {
                     ReleaseInput(ev);
-                    _isPressed = false;
+                    _isPressed = false;                    
                 }
 
             }
@@ -372,16 +398,21 @@ namespace DAPolyPaint
                 if (r != null)
                 {
                     _targetTexture = r.sharedMaterial.mainTexture;
+                    _textureData = ToTexture2D(_targetTexture);
+                    
                 }
                 else
                 {
                     _targetTexture = null;
+                    _textureData = null;
                 }
 
             }
             else
             {
                 _targetMesh = null;
+                _targetTexture = null;
+                _textureData = null;
             }
             Repaint();
         }
@@ -407,6 +438,9 @@ namespace DAPolyPaint
                     _meshCollider.sharedMesh = snapshot;
                 }
                 _lastFace = -1;
+
+                _paint = _targetObject.GetComponent<Paint>();
+                if (_paint == null) _paint = _targetObject.AddComponent<Paint>();
                 
             } else
             {
@@ -425,7 +459,55 @@ namespace DAPolyPaint
             Debug.Log(s);
         }
 
+        Texture2D ToTexture2D(Texture tex)
+        {
+            var texture2D = new Texture2D(tex.width, tex.height, TextureFormat.RGBA32, false);
+            var currentRT = RenderTexture.active;
+            var renderTexture = new RenderTexture(tex.width, tex.height, 32);
+            Graphics.Blit(tex, renderTexture);
+            RenderTexture.active = renderTexture;
+            texture2D.ReadPixels(new Rect(0, 0, renderTexture.width, renderTexture.height), 0, 0);
+            texture2D.Apply();
+            RenderTexture.active = currentRT;
+            return texture2D;
+        }
+
 
     }
 
+    [CustomEditor(typeof(Paint))]
+    public class PaintEditor : Editor
+    {
+        static Color _currPixelColor;
+        static List<Vector3> _polyCursor = new List<Vector3>();
+
+        public static bool PaintMode { get; set; }
+        public static List<Vector3> PolyCursor { get { return _polyCursor; }}
+
+        public static void SetPixelColor(Color c)
+        {
+            _currPixelColor = c.linear;
+        }
+
+        [DrawGizmo(GizmoType.Selected | GizmoType.NonSelected)]
+        static void DrawGizmos(Paint obj, GizmoType gizmoType) //need to be static
+        {
+            if (PaintMode)
+            {
+                for (var i = 0; i < _polyCursor.Count; i++)
+                { 
+                    var p1 = _polyCursor[i];
+                    var p2 = _polyCursor[0];
+                    if (i< _polyCursor.Count-1) p2 = _polyCursor[i+1];
+                    Gizmos.color = _currPixelColor;
+                    Gizmos.DrawLine(p1, p2);                    
+                }
+            }
+	    }
+
+        void ONSceneGUI()
+        {
+            //can draw GUI or interactive handles
+        }
+    }
 }

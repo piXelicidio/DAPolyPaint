@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 
@@ -94,7 +95,7 @@ namespace DAPolyPaint
             _targetMesh.SetUVs(_channel, _UVs);
         }
 
-        public void GetFaceVerts(int face, List<Vector3> verts)
+        public void GetFaceVerts(int face, List<Vector3> verts )
         {
             if (face > 0)
             {
@@ -102,6 +103,17 @@ namespace DAPolyPaint
                 verts.Add(_vertices[face * 3]);
                 verts.Add(_vertices[face * 3 + 1]);
                 verts.Add(_vertices[face * 3 + 2]);
+            }
+        }
+
+        public void GetFaceVerts(int face, List<Vector3> verts, Matrix4x4 transformMat)
+        {
+            verts.Clear();
+            if (face > 0)
+            {                
+                verts.Add(transformMat.MultiplyPoint3x4(_vertices[face * 3]));
+                verts.Add(transformMat.MultiplyPoint3x4(_vertices[face * 3 + 1]));
+                verts.Add(transformMat.MultiplyPoint3x4(_vertices[face * 3 + 2]));
             }
         }
     }
