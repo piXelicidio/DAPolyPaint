@@ -54,7 +54,6 @@ namespace DAPolyPaint
                 {
                     newBW[i] = boneWeights[idx];
                 }
-
             }
             
             if (m.subMeshCount > 1) m.subMeshCount = 1; //NOT support for multiple submeshes.
@@ -72,6 +71,11 @@ namespace DAPolyPaint
                 //TODO(maybe later): Use the more complex new SetBoneWeights to support more than 4 bones per vertex
                 m.boneWeights = newBW;
             }
+            BuildFaceGraph();
+        }
+
+        private void BuildFaceGraph()
+        {           
         }
 
         public void SetUV(int face, Vector2 uvc)

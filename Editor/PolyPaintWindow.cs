@@ -64,6 +64,8 @@ namespace DAPolyPaint
                     {
                         PrepareObject();
                         _paintingMode = true;
+                        _lastPixelColor = GetTextureColor(_lastUVpick);
+                        PaintEditor.SetPixelColor(_lastPixelColor);
                         SceneView.lastActiveSceneView.Repaint();
                         PaintEditor.PaintMode = true;
                     }
@@ -79,49 +81,31 @@ namespace DAPolyPaint
                 }
             }
 
-            var check = CheckObject();
-            var statusColorRect = EGL.GetControlRect(false, _statusColorBarHeight);
-            Color statusColor;
-            if (!check.isOk)
+            OnGUI_ObjectStatus();
+            OnGUI_TexturePalette();
+
+            using (new EditorGUI.DisabledScope(!_paintingMode))
             {
-                statusColor = Color.yellow;
-            } else {
-                if (_paintingMode) statusColor = Color.red; else statusColor = Color.green;
+                EGL.Space();
+                if (GUILayout.Button("Full Repaint")) _painter.FullRepaint(_lastUVpick);
             }
-            EditorGUI.DrawRect(statusColorRect, statusColor);
 
-                var s = "";
-            if (_targetObject == null) s = "Object: None selected"; else s = _targetObject.name;
-            
-            _objectInfo = EGL.BeginFoldoutHeaderGroup(_objectInfo, s);
-            if (_objectInfo)
-            {
-                if (check.isOk)
-                {
-                    EGL.HelpBox(check.info, MessageType.None);
-                } else {
-                    EGL.HelpBox(check.info, MessageType.Warning);
-                    //var r = GUILayoutUtility.GetLastRect();
-                    //EditorGUIUtility.rect
-                    //Debug.Log(r.ToString());                    
-                    //EditorGUI.DrawRect(statusColorRect, statusColor);
-                }
+            EGL.EndScrollView();
 
-                
-            }
-            EGL.EndFoldoutHeaderGroup();
+        }
 
-
+        private void OnGUI_TexturePalette()
+        {
             if (_targetTexture)
             {
-                var currWidth = EditorGUIUtility.currentViewWidth;
-                
-                var rt = EGL.GetControlRect(false, currWidth);
+                var texWidth = EditorGUIUtility.currentViewWidth;
+
+                var rt = EGL.GetControlRect(false, texWidth);
                 rt.height = rt.width;
                 EditorGUI.DrawPreviewTexture(rt, _targetTexture);
                 var rtCursor = new Vector2(rt.x, rt.y);
                 rtCursor.x += _lastUVpick.x * rt.width;
-                rtCursor.y += (1 - _lastUVpick.y) * rt.height;                
+                rtCursor.y += (1 - _lastUVpick.y) * rt.height;
                 EditorGUIDrawCursor(rtCursor);
 
 
@@ -136,7 +120,7 @@ namespace DAPolyPaint
                         mousePos.y = 1 - mousePos.y;
                         _lastUVpick = mousePos;
 
-                        _lastPixelColor = _textureData.GetPixel((int) (mousePos.x * _textureData.width), (int) (mousePos.y * _textureData.height));
+                        _lastPixelColor = GetTextureColor(_lastUVpick);
                         PaintEditor.SetPixelColor(_lastPixelColor);
 
                         Repaint();
@@ -148,20 +132,49 @@ namespace DAPolyPaint
                 cRect.x += cRect.width;
                 EditorGUI.LabelField(cRect, _lastUVpick.ToString());
                 cRect.x = cRect.width - cRect.height;
-                cRect.width = cRect.height;                
+                cRect.width = cRect.height;
                 EditorGUI.DrawRect(cRect, _lastPixelColor);
             }
+        }
 
-            
+        private Color GetTextureColor(Vector2 uv)
+        {
+            if (_textureData == null) 
+                return Color.white;
+            else
+                return _textureData.GetPixel((int)(uv.x * _textureData.width), (int)(uv.y * _textureData.height));
+        }
 
-            using (new EditorGUI.DisabledScope(!_paintingMode))
+        private void OnGUI_ObjectStatus()
+        {
+            var check = CheckObject();
+            var statusColorRect = EGL.GetControlRect(false, _statusColorBarHeight);
+            Color statusColor;
+            if (!check.isOk)
             {
-                EGL.Space();
-                if (GUILayout.Button("Full Repaint")) _painter.FullRepaint(_lastUVpick);
+                statusColor = Color.yellow;
             }
-            
-            EGL.EndScrollView();
+            else
+            {
+                if (_paintingMode) statusColor = Color.red; else statusColor = Color.green;
+            }
+            EditorGUI.DrawRect(statusColorRect, statusColor);
+            var s = "";
+            if (_targetObject == null) s = "Object: None selected"; else s = _targetObject.name;
 
+            _objectInfo = EGL.BeginFoldoutHeaderGroup(_objectInfo, s);
+            if (_objectInfo)
+            {
+                if (check.isOk)
+                {
+                    EGL.HelpBox(check.info, MessageType.None);
+                }
+                else
+                {
+                    EGL.HelpBox(check.info, MessageType.Warning);                    
+                }
+            }
+            EGL.EndFoldoutHeaderGroup();
         }
 
         private (bool isOk, string info) CheckObject()
@@ -492,17 +505,24 @@ namespace DAPolyPaint
         [DrawGizmo(GizmoType.Selected | GizmoType.NonSelected)]
         static void DrawGizmos(Paint obj, GizmoType gizmoType) //need to be static
         {
-            if (PaintMode)
+            if (PaintMode && _polyCursor.Count > 2)
             {
+                var average = Vector3.zero;
+                Debug.Log(_polyCursor.Count);
                 for (var i = 0; i < _polyCursor.Count; i++)
-                { 
-                    var p1 = _polyCursor[i];
-                    var p2 = _polyCursor[0];
-                    if (i< _polyCursor.Count-1) p2 = _polyCursor[i+1];
+                {
                     Gizmos.color = _currPixelColor;
-                    Gizmos.DrawLine(p1, p2);                    
+                    Gizmos.DrawLine(_polyCursor[i], _polyCursor[(i + 1) % _polyCursor.Count]);
+                    average += _polyCursor[i];
                 }
+                average = average / _polyCursor.Count;
+
+                //normal
+
+                var n = Vector3.Cross((_polyCursor[2] - _polyCursor[1]), (_polyCursor[0] - _polyCursor[1])).normalized;
+                Gizmos.DrawLine(average, average + n * 0.1f);
             }
+            
 	    }
 
         void ONSceneGUI()
