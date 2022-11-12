@@ -508,7 +508,7 @@ namespace DAPolyPaint
             if (PaintMode && _polyCursor.Count > 2)
             {
                 var average = Vector3.zero;
-                Debug.Log(_polyCursor.Count);
+                //Debug.Log(_polyCursor.Count);
                 for (var i = 0; i < _polyCursor.Count; i++)
                 {
                     Gizmos.color = _currPixelColor;
