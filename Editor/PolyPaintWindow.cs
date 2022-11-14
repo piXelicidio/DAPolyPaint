@@ -327,7 +327,7 @@ namespace DAPolyPaint
                     if (_lastFace != prevFace)
                     {
                         if (_isPressed) _painter.SetUV(_lastFace, _lastUVpick);
-                        _painter.GetFaceVerts(_lastFace, PaintEditor.PolyCursor, _targetObject.transform.localToWorldMatrix);
+                        BuildCursor();
                     }                    
                     this.Repaint();                    
                 } 
@@ -337,7 +337,7 @@ namespace DAPolyPaint
                     _lastFace = GetFaceHit(scene, ev.mousePosition);
                     if (_lastFace != prevFace)
                     {
-                        _painter.GetFaceVerts(_lastFace, PaintEditor.PolyCursor, _targetObject.transform.localToWorldMatrix);
+                        BuildCursor();
                         //SceneView.RepaintAll();
                         scene.Repaint();
                         //Repaint();
@@ -351,7 +351,7 @@ namespace DAPolyPaint
                     {                        
                         _lastFace = GetFaceHit(scene, ev.mousePosition);
                         _painter.SetUV(_lastFace, _lastUVpick);
-                        _painter.GetFaceVerts(_lastFace, PaintEditor.PolyCursor, _targetObject.transform.localToWorldMatrix);
+                        BuildCursor();                        
                         Repaint();
                     }
                 }
@@ -364,23 +364,19 @@ namespace DAPolyPaint
             }
         }
 
-        private void DrawFaceCursor()
+        private void BuildCursor()
         {
-            var verts = new List<Vector3>();            
-            _painter.GetFaceVerts(_lastFace, verts);
-            if (verts.Count > 0)
-            {
-                verts.Add(verts[0]);
-                var mat = _targetObject.transform.localToWorldMatrix;
-                for (int i = 0; i < verts.Count; i++)
+            PaintEditor.PolyCursor.Clear();
+            if (_lastFace > 0)
+            {                
+                var poly = new List<Vector3>();
+                _painter.GetFaceVerts(_lastFace, poly, _targetObject.transform.localToWorldMatrix);
+                PaintEditor.PolyCursor.Add(poly);
+                foreach (var link in _painter.GetFaceLinks(_lastFace))
                 {
-                    verts[i] = mat.MultiplyPoint3x4(verts[i]);
-                }
-
-                for (int i = 0; i < verts.Count - 1; i++)
-                {
-                    //Debug.DrawLine(verts[i], verts[i+1]);
-                    Handles.DrawLine(verts[i], verts[i + 1]);
+                    poly = new List<Vector3>();
+                    _painter.GetFaceVerts(link.with, poly, _targetObject.transform.localToWorldMatrix);
+                    PaintEditor.PolyCursor.Add(poly);
                 }
             }
         }
@@ -488,14 +484,16 @@ namespace DAPolyPaint
 
     }
 
+    public class PolyList : List<List<Vector3>> { }
+
     [CustomEditor(typeof(Paint))]
     public class PaintEditor : Editor
     {
         static Color _currPixelColor;
-        static List<Vector3> _polyCursor = new List<Vector3>();
+        static PolyList _polyCursor = new PolyList();
 
         public static bool PaintMode { get; set; }
-        public static List<Vector3> PolyCursor { get { return _polyCursor; }}
+        public static PolyList PolyCursor { get { return _polyCursor; }}
 
         public static void SetPixelColor(Color c)
         {
@@ -505,22 +503,29 @@ namespace DAPolyPaint
         [DrawGizmo(GizmoType.Selected | GizmoType.NonSelected)]
         static void DrawGizmos(Paint obj, GizmoType gizmoType) //need to be static
         {
-            if (PaintMode && _polyCursor.Count > 2)
+            if (PaintMode && _polyCursor.Count > 0)
             {
-                var average = Vector3.zero;
-                //Debug.Log(_polyCursor.Count);
-                for (var i = 0; i < _polyCursor.Count; i++)
+                for (int p=0; p<_polyCursor.Count; p++)
                 {
-                    Gizmos.color = _currPixelColor;
-                    Gizmos.DrawLine(_polyCursor[i], _polyCursor[(i + 1) % _polyCursor.Count]);
-                    average += _polyCursor[i];
+                    var poly = _polyCursor[p]; 
+                    if (poly.Count > 2)
+                    {
+                        var average = Vector3.zero;
+
+                        for (var i = 0; i < poly.Count; i++)
+                        {
+                            Gizmos.color = _currPixelColor;
+                            Gizmos.DrawLine(poly[i], poly[(i + 1) % poly.Count]);
+                            average += poly[i];
+                        }
+
+                        if (p > 0) continue;
+                        //normal vec, only for the first one
+                        average = average / poly.Count;
+                        var n = Vector3.Cross((poly[2] - poly[1]), (poly[0] - poly[1])).normalized;
+                        Gizmos.DrawLine(average, average + n * 0.1f);
+                    }
                 }
-                average = average / _polyCursor.Count;
-
-                //normal
-
-                var n = Vector3.Cross((_polyCursor[2] - _polyCursor[1]), (_polyCursor[0] - _polyCursor[1])).normalized;
-                Gizmos.DrawLine(average, average + n * 0.1f);
             }
             
 	    }

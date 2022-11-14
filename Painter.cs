@@ -19,7 +19,8 @@ namespace DAPolyPaint
         Vector3[] _indexedVerts;
         int[] _triangles;
         int[] _indexedFaces;
-        List<FaceLink>[] _faceLinks;
+        List<FaceLink>[] _faceLinks;        
+
         int _channel = 0;
 
         public Mesh Target { get { return _targetMesh; }  }
@@ -36,6 +37,8 @@ namespace DAPolyPaint
 
         void RebuildMeshForPainting()
         {
+            var t = Environment.TickCount;
+            Debug.Log("<b>Preparing mesh...</b> ");
             var m = _targetMesh;
             var tris = m.triangles;
             var vertices = m.vertices;
@@ -79,8 +82,11 @@ namespace DAPolyPaint
                 m.boneWeights = newBW;
             }
 
-            Indexify();
+            Indexify();                        
             BuildFaceGraph();
+
+            Debug.Log("<b>Elapsed:</b> " + (Environment.TickCount - t).ToString() + "ms");
+
         }
 
         //Define a new indexed view of the mesh, optimized like it was on 3ds Max source.
@@ -94,14 +100,15 @@ namespace DAPolyPaint
             var indexReplace = new int[_triangles.Length];
             _indexedFaces = new int[_triangles.Length];
             
-            for (int i=0; i<NumVerts-1; i++)
+            for (int i=0; i<NumVerts; i++)
             {
                 var v = _vertices[i];
                 var idx = sharedVerts.FindIndex(x => x == v);
+                
                 if (idx == -1)
                 {
+                    indexReplace[i] = sharedVerts.Count;
                     sharedVerts.Add(v);
-                    indexReplace[i] = i;
                 } else
                 {
                     indexReplace[i] = idx;
@@ -128,33 +135,55 @@ namespace DAPolyPaint
             };
         }        
 
+
         //build relationships, find links between faces
         //Assumes Indexify() was called first
         private void BuildFaceGraph()
         {
-            //TODO: It's too slow, while it does the work
-            //TODO: Maybe only edge link is needed, 2 common verts. Ignore a single common vertex.
             //NOTE: 3 common verts is an annomally
             var sum = 0.0f;
             _faceLinks = new List<FaceLink>[NumFaces];
-            for (var i=0; i<NumFaces-1; i++)
+            for (var i = 0; i < NumFaces; i++)
             {
                 _faceLinks[i] = new List<FaceLink>();
-                for (var j=0; j<NumFaces-1; j++)
-                    if (i!=j)
+                for (var j = 0; j < NumFaces; j++)
+                {
+                    if (i != j)
                     {
-                        //TODO: get rid of "new" objects creation here?
-                        var commonVerts = new HashSet<int>(GetFaceVerts(i));                        
-                        commonVerts.IntersectWith(new HashSet<int>(GetFaceVerts(j)));
-                        if (commonVerts.Count > 0)
+
+                        //find coincidences...
+                        var count = 0;
+                        int[] coin = new int[2];
+                        int[] pos = new int[2];
+                        for (int v1 = i * 3; v1 < i * 3 + 3; v1++)
+                        {
+                            for (int v2 = j * 3; v2 < j * 3 + 3; v2++)
+                            {
+                                if (_indexedFaces[v1] == _indexedFaces[v2])
+                                {
+                                    coin[count] = _indexedFaces[v1];
+                                    pos[count] = v1 - i * 3;
+                                    count++;
+                                    break;
+                                }
+                            }
+                            if (count == 2) break;
+                        }
+
+                        //ignoring single shared vertices.
+                        if (count == 2)
                         {
                             //there is connection:
                             FaceLink link;
-                            link.face = j;
-                            link.commonVerts = commonVerts.ToArray();
+                            link.with = j;
+                            link.VertIdx1 = coin[0];
+                            link.FaceVertPos1 = pos[0];
+                            link.VertIdx2 = coin[1];
+                            link.FaceVertPos2 = pos[1];
                             _faceLinks[i].Add(link);
                         }
                     }
+                }
                 sum += _faceLinks[i].Count;
             }
             Debug.Log("Average Num Links: " + (sum / NumFaces).ToString());
@@ -209,11 +238,20 @@ namespace DAPolyPaint
                 verts.Add(transformMat.MultiplyPoint3x4(_vertices[face * 3 + 2]));
             }
         }
+
+        public List<FaceLink> GetFaceLinks(int face)
+        {
+            return _faceLinks[face]; 
+        }
     }
 
     public struct FaceLink
     {
-        public int face;
-        public int[] commonVerts;        
+        public int with;            //linked with which other face?
+        public int VertIdx1;        //index of the vertex on _indexedVerts
+        public int VertIdx2;        
+        public int FaceVertPos1;    //position on the triangle face: 0, 1, or 2;
+        public int FaceVertPos2;
     }
+    
 }
