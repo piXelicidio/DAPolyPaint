@@ -191,6 +191,7 @@ namespace DAPolyPaint
                 info += "\nFace: " + _lastFace.ToString();
                 info += "\nSetUVs calls: " + _painter.NumUVCalls.ToString();
                 info += "\nSkinned: " + _skinned.ToString();
+                info += "\n quadBest: " + _painter._nearBest.ToString();
             }
             return (isOk, info);
         }
@@ -372,12 +373,21 @@ namespace DAPolyPaint
                 var poly = new List<Vector3>();
                 _painter.GetFaceVerts(_lastFace, poly, _targetObject.transform.localToWorldMatrix);
                 PaintEditor.PolyCursor.Add(poly);
-                foreach (var link in _painter.GetFaceLinks(_lastFace))
+
+                var quadBro = _painter.FindQuad(_lastFace);
+                if (quadBro != -1)
                 {
                     poly = new List<Vector3>();
-                    _painter.GetFaceVerts(link.with, poly, _targetObject.transform.localToWorldMatrix);
+                    _painter.GetFaceVerts(quadBro, poly, _targetObject.transform.localToWorldMatrix);
                     PaintEditor.PolyCursor.Add(poly);
                 }
+                //adding all linked faces
+                //foreach (var link in _painter.GetFaceLinks(_lastFace))
+                //{
+                //    poly = new List<Vector3>();
+                //    _painter.GetFaceVerts(link.with, poly, _targetObject.transform.localToWorldMatrix);
+                //    PaintEditor.PolyCursor.Add(poly);
+                //}
             }
         }
 

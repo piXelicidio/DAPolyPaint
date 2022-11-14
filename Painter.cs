@@ -15,13 +15,15 @@ namespace DAPolyPaint
         Mesh _targetMesh;
         bool _skinned;
         List<Vector2> _UVs;
-        Vector3[] _vertices;
+        Vector3[] _vertices;            //all non optimized vertices of the actual mesh
         Vector3[] _indexedVerts;
         int[] _triangles;
         int[] _indexedFaces;
+        float[] _angles;                //angle of each triangle corners
         List<FaceLink>[] _faceLinks;        
 
         int _channel = 0;
+        public float _nearBest;
 
         public Mesh Target { get { return _targetMesh; }  }
         public int NumUVCalls { get; private set; }
@@ -82,12 +84,16 @@ namespace DAPolyPaint
                 m.boneWeights = newBW;
             }
 
-            Indexify();                        
+            
+            Indexify();
+            CalcAngles();
             BuildFaceGraph();
 
             Debug.Log("<b>Elapsed:</b> " + (Environment.TickCount - t).ToString() + "ms");
 
         }
+
+
 
         //Define a new indexed view of the mesh, optimized like it was on 3ds Max source.
         //Needed for geting relationships between faces, edges, verts.
@@ -125,6 +131,23 @@ namespace DAPolyPaint
             Debug.Log(String.Format("NumVerts before:{0} after:{1}", NumVerts, sharedVerts.Count));
         }
 
+        private void CalcAngles()
+        {
+            _angles = new float[_indexedFaces.Length];            
+            for (var f=0; f<NumFaces; f++)
+            {
+                for (var i=0; i<3; i++)
+                {
+                    var thisIdx = f * 3 + i;
+                    var nextIdx = f * 3 + (i + 1) % 3;
+                    var prevIdx = f * 3 + ((i+3) - 1) % 3;
+                    var v1 = _indexedVerts[_indexedFaces[nextIdx]] - _indexedVerts[_indexedFaces[thisIdx]];
+                    var v2 = _indexedVerts[_indexedFaces[prevIdx]] - _indexedVerts[_indexedFaces[thisIdx]];
+                    _angles[f*3+i] = Vector3.Angle(v1, v2);
+                }
+            }
+        }
+
         //Return list of Verts indices, no validations
         private List<int> GetFaceVerts(int face)
         {
@@ -143,50 +166,99 @@ namespace DAPolyPaint
             //NOTE: 3 common verts is an annomally
             var sum = 0.0f;
             _faceLinks = new List<FaceLink>[NumFaces];
-            for (var i = 0; i < NumFaces; i++)
+            for (var i = 0; i < NumFaces-1; i++)
             {
-                _faceLinks[i] = new List<FaceLink>();
-                for (var j = 0; j < NumFaces; j++)
+                if (_faceLinks[i] == null) _faceLinks[i] = new List<FaceLink>();
+                for (var j = i+1; j < NumFaces; j++)
                 {
-                    if (i != j)
+                    //find coincidences...
+                    var count = 0;
+                    int[] pos = new int[2];
+                    int[] posOther = new int[2];
+                    for (int v1 = i * 3; v1 < i * 3 + 3; v1++)
                     {
-
-                        //find coincidences...
-                        var count = 0;
-                        int[] coin = new int[2];
-                        int[] pos = new int[2];
-                        for (int v1 = i * 3; v1 < i * 3 + 3; v1++)
+                        for (int v2 = j * 3; v2 < j * 3 + 3; v2++)
                         {
-                            for (int v2 = j * 3; v2 < j * 3 + 3; v2++)
+                            if (_indexedFaces[v1] == _indexedFaces[v2])
                             {
-                                if (_indexedFaces[v1] == _indexedFaces[v2])
-                                {
-                                    coin[count] = _indexedFaces[v1];
-                                    pos[count] = v1 - i * 3;
-                                    count++;
-                                    break;
-                                }
+                                pos[count] = v1 - i * 3;
+                                posOther[count] = v2 - j * 3;
+                                count++;
+                                break;
                             }
-                            if (count == 2) break;
                         }
-
-                        //ignoring single shared vertices.
-                        if (count == 2)
-                        {
-                            //there is connection:
-                            FaceLink link;
-                            link.with = j;
-                            link.VertIdx1 = coin[0];
-                            link.FaceVertPos1 = pos[0];
-                            link.VertIdx2 = coin[1];
-                            link.FaceVertPos2 = pos[1];
-                            _faceLinks[i].Add(link);
-                        }
+                        if (count == 2) break;
                     }
+
+                    //ignoring single shared vertices.
+                    if (count == 2)
+                    {
+                        //there is connection:
+                        FaceLink link, linkOther;
+                        link.with = j;
+                        link.p1 = pos[0];                  //shared face points 
+                        link.p2 = pos[1];
+                        link.pOut = 3 - (pos[0] + pos[1]); //point left out
+                            
+                        linkOther.with = i;
+                        linkOther.p1 = posOther[0];
+                        linkOther.p2 = posOther[1];
+                        linkOther.pOut = 3 - (posOther[0] + posOther[1]);                           
+
+                        if (_faceLinks[j] == null) _faceLinks[j] = new List<FaceLink>();
+                        link.backLinkIdx = _faceLinks[j].Count;
+                        linkOther.backLinkIdx = _faceLinks[i].Count;
+                        _faceLinks[i].Add(link);
+                        _faceLinks[j].Add(linkOther);
+                    }
+                    
+                    
                 }
                 sum += _faceLinks[i].Count;
             }
             Debug.Log("Average Num Links: " + (sum / NumFaces).ToString());
+        }
+
+        public int FindQuad(int face, float tolerance = 60f)
+        {
+            var best = -1;
+            var nearBest = tolerance;
+            //if ( _faceLinks[face].Count > 0)
+            //{
+            //    return _faceLinks[face][0].with;
+            //}
+            for (int i=0; i<_faceLinks[face].Count; i++)
+            {
+                var linkTo = _faceLinks[face][i];
+                var faceOther = linkTo.with;
+                var linkFrom = _faceLinks[faceOther][linkTo.backLinkIdx];
+                if (linkFrom.with != face)
+                {
+                    Debug.LogError("Bad backlinkIdx!");
+                }
+
+                
+                var angles = new float[4];
+                //the two corners that are not part of the common edge
+                angles[0] = _angles[face * 3 + linkTo.pOut];
+                angles[1] = _angles[faceOther * 3 + linkFrom.pOut];
+                //shared corners added togather, sum should be close to 90... to be a quad
+                angles[2] = _angles[face * 3 + linkTo.p1] + _angles[faceOther * 3 + linkFrom.p1];
+                angles[3] = _angles[face * 3 + linkTo.p2] + _angles[faceOther * 3 + linkFrom.p2];
+
+                var near = 0f;
+                for (int j = 0; j < 4; j++)
+                {
+                    near += Math.Abs(90f - angles[j]);
+                }
+                if (near < nearBest)
+                {
+                    best = faceOther;
+                    nearBest = near;
+                }
+            }
+            _nearBest = nearBest;
+            return best;
         }
 
         private (int a, int b, int c) GetFaceVertsIdxs(int face)
@@ -248,10 +320,9 @@ namespace DAPolyPaint
     public struct FaceLink
     {
         public int with;            //linked with which other face?
-        public int VertIdx1;        //index of the vertex on _indexedVerts
-        public int VertIdx2;        
-        public int FaceVertPos1;    //position on the triangle face: 0, 1, or 2;
-        public int FaceVertPos2;
+        public int p1, p2;          //shared vertices, as position index in the face 0,1 or 2;
+        public int pOut;            //the vertice point that is not shared.
+        public int backLinkIdx;     //position index on the other face List of links corresponding to this link O.o capichi
     }
     
 }
