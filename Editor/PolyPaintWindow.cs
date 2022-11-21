@@ -474,6 +474,7 @@ namespace DAPolyPaint
                     var snapshot = new Mesh();
                     smr.BakeMesh(snapshot, true);
                     _meshCollider.sharedMesh = snapshot;
+                    _painter.SetSkinAffected(snapshot);
                 }
                 _lastFace = -1;
 
@@ -546,13 +547,7 @@ namespace DAPolyPaint
                             Gizmos.color = _currPixelColor;
                             Gizmos.DrawLine(poly[i], poly[(i + 1) % poly.Count]);
                             average += poly[i];
-                        }
-
-                        if (p > 0) continue;
-                        //normal vec, only for the first one
-                        average = average / poly.Count;
-                        var n = Vector3.Cross((poly[2] - poly[1]), (poly[0] - poly[1])).normalized;
-                        Gizmos.DrawLine(average, average + n * 0.1f);
+                        }                        
                     }
                 }
             }

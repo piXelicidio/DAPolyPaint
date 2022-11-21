@@ -24,6 +24,8 @@ namespace DAPolyPaint
 
         int _channel = 0;
         public float _nearBest;
+        private Mesh _skinAffected;
+        private Vector3[] _verticesSkinned;
 
         public Mesh Target { get { return _targetMesh; }  }
         public int NumUVCalls { get; private set; }
@@ -34,6 +36,7 @@ namespace DAPolyPaint
         {
             _targetMesh = target;
             _skinned = skinned;
+            _skinAffected = null;
             RebuildMeshForPainting();            
         }
 
@@ -81,7 +84,7 @@ namespace DAPolyPaint
             if (_skinned)
             {
                 //TODO(maybe later): Use the more complex new SetBoneWeights to support more than 4 bones per vertex
-                m.boneWeights = newBW;
+                m.boneWeights = newBW;                
             }
 
             
@@ -268,12 +271,6 @@ namespace DAPolyPaint
             return best;
         }
 
-        private (int a, int b, int c) GetFaceVertsIdxs(int face)
-        {
-            return (face *3, face*3 + 1, face*3 + 2);
-        }
-
-
 
         public void SetUV(int face, Vector2 uvc)
         {
@@ -298,12 +295,19 @@ namespace DAPolyPaint
 
         public void GetFaceVerts(int face, List<Vector3> verts )
         {
-            if (face > 0)
-            {
-                verts.Clear();
-                verts.Add(_vertices[face * 3]);
-                verts.Add(_vertices[face * 3 + 1]);
-                verts.Add(_vertices[face * 3 + 2]);
+            verts.Clear();
+            if (face > 0)            {
+                if (_skinAffected == null)
+                {
+                    verts.Add(_vertices[face * 3]);
+                    verts.Add(_vertices[face * 3 + 1]);
+                    verts.Add(_vertices[face * 3 + 2]);
+                } else
+                {
+                    verts.Add(_verticesSkinned[face * 3]);
+                    verts.Add(_verticesSkinned[face * 3 + 1]);
+                    verts.Add(_verticesSkinned[face * 3 + 2]);
+                }
             }
         }
 
@@ -311,16 +315,30 @@ namespace DAPolyPaint
         {
             verts.Clear();
             if (face > 0)
-            {                
-                verts.Add(transformMat.MultiplyPoint3x4(_vertices[face * 3]));
-                verts.Add(transformMat.MultiplyPoint3x4(_vertices[face * 3 + 1]));
-                verts.Add(transformMat.MultiplyPoint3x4(_vertices[face * 3 + 2]));
+            {
+                if (_skinAffected == null)
+                {
+                    verts.Add(transformMat.MultiplyPoint3x4(_vertices[face * 3]));
+                    verts.Add(transformMat.MultiplyPoint3x4(_vertices[face * 3 + 1]));
+                    verts.Add(transformMat.MultiplyPoint3x4(_vertices[face * 3 + 2])); 
+                } else
+                {
+                    verts.Add(transformMat.MultiplyPoint3x4(_verticesSkinned[face * 3]));
+                    verts.Add(transformMat.MultiplyPoint3x4(_verticesSkinned[face * 3 + 1]));
+                    verts.Add(transformMat.MultiplyPoint3x4(_verticesSkinned[face * 3 + 2]));
+                }
             }
         }
 
         public List<FaceLink> GetFaceLinks(int face)
         {
             return _faceLinks[face]; 
+        }
+
+        public void SetSkinAffected(Mesh snapshot)
+        {
+            _skinAffected = snapshot;
+            _verticesSkinned = snapshot.vertices;
         }
     }
 
