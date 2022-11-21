@@ -31,6 +31,7 @@ namespace DAPolyPaint
         private Color _lastPixelColor;
         private Vector2 _scrollPos;
         private MeshCollider _meshCollider;
+        private bool _autoQuads;
         const float _statusColorBarHeight = 3; 
 
         [MenuItem("DA-Tools/Poly Paint")]
@@ -87,6 +88,7 @@ namespace DAPolyPaint
             using (new EditorGUI.DisabledScope(!_paintingMode))
             {
                 EGL.Space();
+                _autoQuads = EGL.Toggle("Auto-detect quads", _autoQuads);
                 if (GUILayout.Button("Full Repaint")) _painter.FullRepaint(_lastUVpick);
             }
 
@@ -327,7 +329,7 @@ namespace DAPolyPaint
                     
                     if (_lastFace != prevFace)
                     {
-                        if (_isPressed) _painter.SetUV(_lastFace, _lastUVpick);
+                        if (_isPressed) PaintFace();
                         BuildCursor();
                     }                    
                     this.Repaint();                    
@@ -349,10 +351,10 @@ namespace DAPolyPaint
                     AcquireInput(ev, id);
                     _isPressed = true;                    
                     if (_targetMesh != null)
-                    {                        
-                        _lastFace = GetFaceHit(scene, ev.mousePosition);
-                        _painter.SetUV(_lastFace, _lastUVpick);
-                        BuildCursor();                        
+                    {                       
+                        _lastFace = GetFaceHit(scene, ev.mousePosition);                        
+                        BuildCursor();
+                        PaintFace();
                         Repaint();
                     }
                 }
@@ -365,6 +367,19 @@ namespace DAPolyPaint
             }
         }
 
+        private void PaintFace()
+        {
+            _painter.SetUV(_lastFace, _lastUVpick);
+            if (_autoQuads)
+            {
+                var quadBro = _painter.FindQuad(_lastFace);                
+                if (quadBro != -1)
+                {
+                    _painter.SetUV(quadBro, _lastUVpick);
+                }
+            }
+        }
+
         private void BuildCursor()
         {
             PaintEditor.PolyCursor.Clear();
@@ -374,12 +389,16 @@ namespace DAPolyPaint
                 _painter.GetFaceVerts(_lastFace, poly, _targetObject.transform.localToWorldMatrix);
                 PaintEditor.PolyCursor.Add(poly);
 
-                var quadBro = _painter.FindQuad(_lastFace);
-                if (quadBro != -1)
+
+                if (_autoQuads)
                 {
-                    poly = new List<Vector3>();
-                    _painter.GetFaceVerts(quadBro, poly, _targetObject.transform.localToWorldMatrix);
-                    PaintEditor.PolyCursor.Add(poly);
+                    var quadBro = _painter.FindQuad(_lastFace);
+                    if (quadBro != -1)
+                    {
+                        poly = new List<Vector3>();
+                        _painter.GetFaceVerts(quadBro, poly, _targetObject.transform.localToWorldMatrix);
+                        PaintEditor.PolyCursor.Add(poly);
+                    } 
                 }
                 //adding all linked faces
                 //foreach (var link in _painter.GetFaceLinks(_lastFace))

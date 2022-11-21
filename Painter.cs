@@ -219,8 +219,15 @@ namespace DAPolyPaint
             Debug.Log("Average Num Links: " + (sum / NumFaces).ToString());
         }
 
+        /// <summary>
+        /// Finds the best neighbor face to complete a quad.
+        /// </summary>
+        /// <param name="face"></param>
+        /// <param name="tolerance"></param>
+        /// <returns>Face index or -1 if not found.</returns>
         public int FindQuad(int face, float tolerance = 60f)
         {
+            if (face == -1) return -1;
             var best = -1;
             var nearBest = tolerance;
             //if ( _faceLinks[face].Count > 0)
