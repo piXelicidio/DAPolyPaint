@@ -24,6 +24,7 @@ namespace DAPolyPaint
 
         int _channel = 0;
         public float _nearBest;
+        Texture2D _textureData;
         private Mesh _skinAffected;
         private Vector3[] _verticesSkinned;
 
@@ -32,11 +33,12 @@ namespace DAPolyPaint
         public int NumFaces { get { return _triangles.Length / 3; } }
         public int NumVerts { get { return _vertices.Length; } }
 
-        public void SetMeshAndRebuild(Mesh target, bool skinned)
+        public void SetMeshAndRebuild(Mesh target, bool skinned, Texture2D texture)
         {
             _targetMesh = target;
             _skinned = skinned;
             _skinAffected = null;
+            _textureData = texture;
             RebuildMeshForPainting();            
         }
 
@@ -284,6 +286,19 @@ namespace DAPolyPaint
             }
         }
 
+        //A face actually have 3 UV values but, here all are the same
+        //so only one is enough
+        public Vector2 GetUV(int face)
+        {
+            if (face != - 1 && face < _UVs.Count)
+            {
+                return _UVs[face*3];
+            } else
+            {
+                return new Vector2(-1,-1);
+            }
+        }
+
         public void FullRepaint(Vector2 uvc)
         {
             for (int i = 0; i < _UVs.Count; i++)
@@ -339,6 +354,55 @@ namespace DAPolyPaint
         {
             _skinAffected = snapshot;
             _verticesSkinned = snapshot.vertices;
+        }
+
+        public void FillPaint(int startFace, Vector2 uvc)
+        {            
+            var bk_pixelColor = GetTextureColor(GetUV(startFace));
+            var border = new HashSet<int>();
+            border.Add(startFace);
+            var neighbors = new HashSet<int>();
+            var forceQuit = 0;
+
+            do
+            {
+                //paint border
+                foreach (int face in border)
+                {
+                    _UVs[face * 3] = uvc;
+                    _UVs[face * 3 + 1] = uvc;
+                    _UVs[face * 3 + 2] = uvc;             
+                    
+                }
+                _targetMesh.SetUVs(_channel, _UVs);  //can be called at the end just once
+                //find neighbors
+                neighbors.Clear();
+                var noSpread = 0;
+                foreach (int face in border)
+                {
+                    var faceLinks = GetFaceLinks(face);
+                    foreach (var l in faceLinks)
+                    {
+                        if (GetTextureColor(_UVs[l.with*3]) == bk_pixelColor)
+                        {
+                            neighbors.Add(l.with);                            
+                        }
+                        else noSpread++;
+                    }
+                }
+                //swap                
+                (border, neighbors) = (neighbors, border);
+                Debug.Log(string.Format("ye({0}) no({1})", border.Count, noSpread));
+                forceQuit++;
+            } while (border.Count > 0 && forceQuit<30);
+        }
+
+        public Color GetTextureColor(Vector2 uv)
+        {
+            if (_textureData == null)
+                return Color.white;
+            else
+                return _textureData.GetPixel((int)(uv.x * _textureData.width), (int)(uv.y * _textureData.height));
         }
     }
 

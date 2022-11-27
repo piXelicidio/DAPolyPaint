@@ -65,7 +65,7 @@ namespace DAPolyPaint
                     {
                         PrepareObject();
                         _paintingMode = true;
-                        _lastPixelColor = GetTextureColor(_lastUVpick);
+                        _lastPixelColor = _painter.GetTextureColor(_lastUVpick);
                         PaintEditor.SetPixelColor(_lastPixelColor);
                         SceneView.lastActiveSceneView.Repaint();
                         PaintEditor.PaintMode = true;
@@ -122,7 +122,7 @@ namespace DAPolyPaint
                         mousePos.y = 1 - mousePos.y;
                         _lastUVpick = mousePos;
 
-                        _lastPixelColor = GetTextureColor(_lastUVpick);
+                        _lastPixelColor = _painter.GetTextureColor(_lastUVpick);
                         PaintEditor.SetPixelColor(_lastPixelColor);
 
                         Repaint();
@@ -139,13 +139,7 @@ namespace DAPolyPaint
             }
         }
 
-        private Color GetTextureColor(Vector2 uv)
-        {
-            if (_textureData == null) 
-                return Color.white;
-            else
-                return _textureData.GetPixel((int)(uv.x * _textureData.width), (int)(uv.y * _textureData.height));
-        }
+
 
         private void OnGUI_ObjectStatus()
         {
@@ -348,13 +342,21 @@ namespace DAPolyPaint
                 }
                 else if (ev.type == EventType.MouseDown)
                 {
-                    AcquireInput(ev, id);
+                    AcquireInput(ev, id);                    
                     _isPressed = true;                    
                     if (_targetMesh != null)
                     {                       
                         _lastFace = GetFaceHit(scene, ev.mousePosition);                        
                         BuildCursor();
-                        PaintFace();
+                        if (ev.shift && ev.control) { } 
+                        else if (ev.control) 
+                        {
+                            if (_lastFace != -1) _painter.FillPaint(_lastFace, _lastUVpick);
+                        }
+                        else if (ev.shift) 
+                        { 
+
+                        } else PaintFace();
                         Repaint();
                     }
                 }
@@ -372,7 +374,7 @@ namespace DAPolyPaint
             _painter.SetUV(_lastFace, _lastUVpick);
             if (_autoQuads)
             {
-                var quadBro = _painter.FindQuad(_lastFace);                
+                var quadBro = _painter.FindQuad(_lastFace);
                 if (quadBro != -1)
                 {
                     _painter.SetUV(quadBro, _lastUVpick);
@@ -460,7 +462,7 @@ namespace DAPolyPaint
             if (_targetMesh != null)
             {
                 LogMeshInfo(_targetMesh);
-                _painter.SetMeshAndRebuild(_targetMesh, _skinned);
+                _painter.SetMeshAndRebuild(_targetMesh, _skinned, _textureData);
                 _meshCollider = _targetObject.GetComponent<MeshCollider>();
                 if (_meshCollider == null) _meshCollider = _targetObject.AddComponent<MeshCollider>();                
                 if (!_skinned)
