@@ -362,7 +362,9 @@ namespace DAPolyPaint
             var border = new HashSet<int>();
             border.Add(startFace);
             var neighbors = new HashSet<int>();
-            var forceQuit = 0;
+            var iters = 0;
+
+            var t = Environment.TickCount;
 
             do
             {
@@ -392,9 +394,10 @@ namespace DAPolyPaint
                 }
                 //swap                
                 (border, neighbors) = (neighbors, border);
-                Debug.Log(string.Format("ye({0}) no({1})", border.Count, noSpread));
-                forceQuit++;
-            } while (border.Count > 0 && forceQuit<30);
+
+                iters++;
+            } while (border.Count > 0 && iters<1000);  //TODO: Improve this arbitrary limit
+            Debug.Log(String.Format("Iters:{0} Elapsed:{1}ms", iters, Environment.TickCount - t));
         }
 
         public Color GetTextureColor(Vector2 uv)

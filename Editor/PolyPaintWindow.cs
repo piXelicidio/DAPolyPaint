@@ -348,15 +348,16 @@ namespace DAPolyPaint
                     {                       
                         _lastFace = GetFaceHit(scene, ev.mousePosition);                        
                         BuildCursor();
-                        if (ev.shift && ev.control) { } 
-                        else if (ev.control) 
+                        if (ev.shift && ev.control) 
                         {
                             if (_lastFace != -1) _painter.FillPaint(_lastFace, _lastUVpick);
-                        }
+                        } 
                         else if (ev.shift) 
-                        { 
-
-                        } else PaintFace();
+                        {
+                            PickFromSurface(_lastFace);
+                        }
+                        else if (ev.control) {} 
+                        else PaintFace();
                         Repaint();
                     }
                 }
@@ -366,6 +367,16 @@ namespace DAPolyPaint
                     _isPressed = false;                    
                 }
 
+            }
+        }
+
+        private void PickFromSurface(int face)
+        {
+            if (face != -1)
+            {
+                _lastUVpick = _painter.GetUV(face);
+                _lastPixelColor = _painter.GetTextureColor(_lastUVpick);
+                PaintEditor.SetPixelColor(_lastPixelColor);
             }
         }
 
@@ -556,7 +567,7 @@ namespace DAPolyPaint
             
 	    }
 
-        void ONSceneGUI()
+        void OnSceneGUI()
         {
             //can draw GUI or interactive handles
         }
