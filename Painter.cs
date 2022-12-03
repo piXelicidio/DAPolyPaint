@@ -161,7 +161,22 @@ namespace DAPolyPaint
                 _indexedFaces[face*3+1], 
                 _indexedFaces[face*3+2] 
             };
-        }        
+        }   
+        
+        //given unsoreted position p1 p2 (0..2) in a triangle.
+        //return which side of the triangle it represents.
+        private int GetTriangleSide(int p1, int p2)
+        {
+            var low = Math.Min(p1, p2);
+            var high = Math.Max(p1, p2);
+            if (low==0 && high==2)
+            {
+                return 2;
+            } else
+            {
+                return low;
+            }
+        }
 
 
         //build relationships, find links between faces
@@ -180,14 +195,14 @@ namespace DAPolyPaint
                     var count = 0;
                     int[] pos = new int[2];
                     int[] posOther = new int[2];
-                    for (int v1 = i * 3; v1 < i * 3 + 3; v1++)
+                    for (int p1 = 0; p1 < 3; p1++)
                     {
-                        for (int v2 = j * 3; v2 < j * 3 + 3; v2++)
+                        for (int p2 = 0; p2 < 3; p2++)
                         {
-                            if (_indexedFaces[v1] == _indexedFaces[v2])
+                            if (_indexedFaces[p1 + i*3] == _indexedFaces[p2 + j*3])
                             {
-                                pos[count] = v1 - i * 3;
-                                posOther[count] = v2 - j * 3;
+                                pos[count] = p1 ;
+                                posOther[count] = p2 ;
                                 count++;
                                 break;
                             }
@@ -199,15 +214,22 @@ namespace DAPolyPaint
                     if (count == 2)
                     {
                         //there is connection:
-                        FaceLink link, linkOther;
+                        var link = new FaceLink();
+                        var linkOther = new FaceLink();
                         link.with = j;
                         link.p1 = pos[0];                  //shared face points 
                         link.p2 = pos[1];
+                        link.edge.v1 = _indexedFaces[i * 3 + pos[0]];
+                        link.edge.v2 = _indexedFaces[i * 3 + pos[1]];
+                        link.side = GetTriangleSide(pos[0], pos[1]);
                         link.pOut = 3 - (pos[0] + pos[1]); //point left out
                             
                         linkOther.with = i;
                         linkOther.p1 = posOther[0];
                         linkOther.p2 = posOther[1];
+                        linkOther.edge.v1 = _indexedFaces[j * 3 + posOther[0]];
+                        linkOther.edge.v2 = _indexedFaces[j * 3 + posOther[1]];
+                        linkOther.side = GetTriangleSide(posOther[0], posOther[1]);
                         linkOther.pOut = 3 - (posOther[0] + posOther[1]);                           
 
                         if (_faceLinks[j] == null) _faceLinks[j] = new List<FaceLink>();
@@ -407,14 +429,104 @@ namespace DAPolyPaint
             else
                 return _textureData.GetPixel((int)(uv.x * _textureData.width), (int)(uv.y * _textureData.height));
         }
+
+        //if a link to the other face is not found return null
+        public FaceLink FindLink(int fromFace, int toFace)
+        {
+            if (fromFace!=-1  && toFace!=1)
+            {
+                foreach (var fl in _faceLinks[fromFace])
+                {
+                    if (fl.with == toFace)
+                    {
+                        return fl;
+                    }
+                }
+            }
+            return null;
+        }
+                
+        //Given two adjacent faces (f1 and f2), find a loop.
+        public HashSet<int> FindLoop(int f1, int f2)
+        {            
+            if (f1 == -1 || f2 == -1) return new HashSet<int>();
+
+            var result = new HashSet<int>();
+
+            //confirm they are actually adjacents            
+            var linkToF2 = FindLink(f1, f2);            
+
+            //is F2 part of a Quad?
+            var f2_quadBro = FindQuad(f2);
+
+            //is F1 my Quad brother?
+            bool weQuad = f2_quadBro == f1;
+
+            if (linkToF2 != null && f2_quadBro != -1 && !weQuad) 
+            {
+                result.Add(f2);
+                bool noOverlaps = true;
+                Debug.Log("Let's find the loop!");
+                var breakLimit = 20;
+                do
+                {
+                    
+                    var SharedEdge_f1_f2 = linkToF2.edge;
+                    var jumpToFace = -1;
+                    foreach (FaceLink fl in _faceLinks[f2_quadBro])
+                    {
+                        if (!fl.edge.HaveSharedVerts(SharedEdge_f1_f2))
+                        {
+                            //found oppsite edge
+                            jumpToFace = fl.with;                            
+                            //AddFace(jumpToFace);
+                            break;
+                        };
+                    }
+                    if (jumpToFace == -1) Debug.LogError("Why is happening? no oppsite side found?");
+                    f1 = f2_quadBro;
+                    f2 = jumpToFace;
+                    noOverlaps = result.Add(f1) && result.Add(f2);
+                    f2_quadBro = FindQuad(f2);
+                    weQuad = f2_quadBro == f1;
+                    linkToF2 = FindLink(f1, f2);
+                    breakLimit--;
+                } while (breakLimit > 0 && f2_quadBro != -1 && !weQuad && linkToF2 != null && noOverlaps) ;
+            }
+
+            return result;
+        }
     }
 
-    public struct FaceLink
+    public class FaceLink
     {
         public int with;            //linked with which other face?
         public int p1, p2;          //shared vertices, as position index in the face 0,1 or 2;
+        public Edge edge;           //shared vertices numbers
+        public int side;            //side of the tirangle: 0, 1, or 2;
         public int pOut;            //the vertice point that is not shared.
-        public int backLinkIdx;     //position index on the other face List of links corresponding to this link O.o capichi
+        public int backLinkIdx;     //position index on the other face List of links corresponding to this link O.o capichi      
+    }
+
+    public struct Edge
+    {
+        public int v1, v2;
+
+        public bool Equals(Edge other)
+        {
+            return ((v1 == other.v1 && v2 == other.v2) || (v1 == other.v2 && v2 == other.v1));
+        }
+
+        public Edge(int vert1, int vert2)         
+        {
+            v1 = vert1;
+            v2 = vert2;
+        }
+
+        public bool HaveSharedVerts(Edge other)
+        {
+            return (v1 == other.v1 || v1 == other.v2 || v2 == other.v1 || v2 == other.v2);
+        }
     }
     
 }

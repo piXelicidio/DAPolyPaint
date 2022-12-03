@@ -5,6 +5,7 @@ using UnityEditor;
 using EGL = UnityEditor.EditorGUILayout;
 using System;
 using System.Linq;
+using System.Text;
 
 namespace DAPolyPaint
 {
@@ -323,8 +324,22 @@ namespace DAPolyPaint
                     
                     if (_lastFace != prevFace)
                     {
-                        if (_isPressed) PaintFace();
                         BuildCursor();
+                        if (_isPressed) 
+                        {
+                            if (ev.control)
+                            {
+                                Debug.Log(String.Format("Ctrl+drag: From {0} to {1}", prevFace, _lastFace));
+                                BuildLoopCursor(prevFace, _lastFace);
+                                scene.Repaint();
+                                //PaintUsingCursor();
+                            }
+                            else if (ev.shift) 
+                            {
+                                PickFromSurface(_lastFace);
+                            }
+                            else PaintUsingCursor(); 
+                        }                        
                     }                    
                     this.Repaint();                    
                 } 
@@ -357,17 +372,40 @@ namespace DAPolyPaint
                             PickFromSurface(_lastFace);
                         }
                         else if (ev.control) {} 
-                        else PaintFace();
+                        else PaintUsingCursor();
                         Repaint();
                     }
                 }
                 else if (ev.type == EventType.MouseUp)
                 {
+                    if (ev.control)
+                    {
+                        PaintUsingCursor();
+                    }
                     ReleaseInput(ev);
                     _isPressed = false;                    
                 }
 
             }
+        }
+
+        private void BuildLoopCursor(int fromFace, int toFace)
+        {
+            var loop = _painter.FindLoop(fromFace, toFace);
+            var loopBack = _painter.FindLoop(toFace, fromFace);
+            loop.UnionWith(loopBack);
+
+            PaintEditor.PolyCursor.Clear();   
+            
+            foreach (var f in loop )
+            {
+                var poly = new PolyFace();
+                _painter.GetFaceVerts(f, poly, _targetObject.transform.localToWorldMatrix);
+                poly.FaceNum = f;
+                PaintEditor.PolyCursor.Add(poly);                                
+            }
+            Debug.Log("loop faces: "+ PaintEditor.PolyCursor.Count.ToString());
+            
         }
 
         private void PickFromSurface(int face)
@@ -393,13 +431,22 @@ namespace DAPolyPaint
             }
         }
 
+        private void PaintUsingCursor()
+        {
+            foreach (var polyFace in PaintEditor.PolyCursor)
+            {
+                _painter.SetUV(polyFace.FaceNum, _lastUVpick);
+            }
+        }
+
         private void BuildCursor()
         {
             PaintEditor.PolyCursor.Clear();
-            if (_lastFace > 0)
+            if (_lastFace != -1)
             {                
-                var poly = new List<Vector3>();
+                var poly = new PolyFace();
                 _painter.GetFaceVerts(_lastFace, poly, _targetObject.transform.localToWorldMatrix);
+                poly.FaceNum = _lastFace;
                 PaintEditor.PolyCursor.Add(poly);
 
 
@@ -408,7 +455,8 @@ namespace DAPolyPaint
                     var quadBro = _painter.FindQuad(_lastFace);
                     if (quadBro != -1)
                     {
-                        poly = new List<Vector3>();
+                        poly = new PolyFace();
+                        poly.FaceNum = quadBro;
                         _painter.GetFaceVerts(quadBro, poly, _targetObject.transform.localToWorldMatrix);
                         PaintEditor.PolyCursor.Add(poly);
                     } 
@@ -527,7 +575,12 @@ namespace DAPolyPaint
 
     }
 
-    public class PolyList : List<List<Vector3>> { }
+    public class PolyFace : List<Vector3> 
+    {
+        public int FaceNum;
+    }
+
+    public class PolyList : List<PolyFace> { }
 
     [CustomEditor(typeof(Paint))]
     public class PaintEditor : Editor
