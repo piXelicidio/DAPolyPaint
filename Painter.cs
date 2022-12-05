@@ -11,7 +11,7 @@ namespace DAPolyPaint
     //Many field/variable names are selected based on the 3ds Max Poly Paint tool implementation
     //and Maxscript methods/properties naming (e. g. NumVerts, NumFaces).
     public class Painter
-    {        
+    {
         Mesh _targetMesh;
         bool _skinned;
         List<Vector2> _UVs;
@@ -20,18 +20,23 @@ namespace DAPolyPaint
         int[] _triangles;
         int[] _indexedFaces;
         float[] _angles;                //angle of each triangle corners
-        List<FaceLink>[] _faceLinks;        
+        List<FaceLink>[] _faceLinks;
 
         int _channel = 0;
-        public float _nearBest;
         Texture2D _textureData;
         private Mesh _skinAffected;
         private Vector3[] _verticesSkinned;
 
-        public Mesh Target { get { return _targetMesh; }  }
+        public Mesh Target { get { return _targetMesh; } }
         public int NumUVCalls { get; private set; }
         public int NumFaces { get { return _triangles.Length / 3; } }
         public int NumVerts { get { return _vertices.Length; } }
+        public float QuadTolerance { get; set; }
+
+        public Painter()
+        {
+            QuadTolerance = 120;
+        }
 
         public void SetMeshAndRebuild(Mesh target, bool skinned, Texture2D texture)
         {
@@ -252,15 +257,12 @@ namespace DAPolyPaint
         /// <param name="face"></param>
         /// <param name="tolerance"></param>
         /// <returns>Face index or -1 if not found.</returns>
-        public int FindQuad(int face, float tolerance = 60f)
+        public int FindQuad(int face)
         {
             if (face == -1) return -1;
             var best = -1;
-            var nearBest = tolerance;
-            //if ( _faceLinks[face].Count > 0)
-            //{
-            //    return _faceLinks[face][0].with;
-            //}
+            var nearBest = QuadTolerance;
+      
             for (int i=0; i<_faceLinks[face].Count; i++)
             {
                 var linkTo = _faceLinks[face][i];
@@ -291,7 +293,6 @@ namespace DAPolyPaint
                     nearBest = near;
                 }
             }
-            _nearBest = nearBest;
             return best;
         }
 
@@ -333,7 +334,7 @@ namespace DAPolyPaint
         public void GetFaceVerts(int face, List<Vector3> verts )
         {
             verts.Clear();
-            if (face > 0)            {
+            if (face != -1)            {
                 if (_skinAffected == null)
                 {
                     verts.Add(_vertices[face * 3]);
@@ -351,7 +352,7 @@ namespace DAPolyPaint
         public void GetFaceVerts(int face, List<Vector3> verts, Matrix4x4 transformMat)
         {
             verts.Clear();
-            if (face > 0)
+            if (face != -1)
             {
                 if (_skinAffected == null)
                 {

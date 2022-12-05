@@ -89,8 +89,14 @@ namespace DAPolyPaint
             using (new EditorGUI.DisabledScope(!_paintingMode))
             {
                 EGL.Space();
-                _autoQuads = EGL.Toggle("Auto-detect quads", _autoQuads);
                 if (GUILayout.Button("Full Repaint")) _painter.FullRepaint(_lastUVpick);
+
+                EGL.Space();
+                _autoQuads = EGL.ToggleLeft("Auto-detect quads:", _autoQuads);
+                _autoQuads = GUILayout.Toggle(_autoQuads, "Button", "Button");
+                EGL.PrefixLabel("Max quad tolerance:");
+                _painter.QuadTolerance = EGL.Slider(_painter.QuadTolerance, 0.1f, 360f);
+                
             }
 
             EGL.EndScrollView();
@@ -187,8 +193,7 @@ namespace DAPolyPaint
             {
                 info += "\nFace: " + _lastFace.ToString();
                 info += "\nSetUVs calls: " + _painter.NumUVCalls.ToString();
-                info += "\nSkinned: " + _skinned.ToString();
-                info += "\n quadBest: " + _painter._nearBest.ToString();
+                info += "\nSkinned: " + _skinned.ToString();                
             }
             return (isOk, info);
         }
