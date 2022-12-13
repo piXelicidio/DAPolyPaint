@@ -105,8 +105,9 @@ namespace DAPolyPaint
 
         }
 
-        string GetCurrToolName(int index)
+        string GetCurrToolName()
         {
+            var index = _currTool;
             if (index >= 0 && index < _toolNames.Length)
             {
                 return _toolNames[index];
@@ -339,74 +340,80 @@ namespace DAPolyPaint
                 EditorGUIDrawFrame("PAINT MODE");                
                 Handles.EndGUI();
 
-                if (ev.type == EventType.MouseDrag )
-                {
-                    var prevFace = _lastFace;
-                    _lastFace = GetFaceHit(scene, ev.mousePosition);
-                    
-                    if (_lastFace != prevFace)
+                var tool = GetCurrToolName();
+                //but shiftstates overrides
+                if (ev.shift && ev.control) tool = "Fill";
+                else if (ev.control) tool = "Loop";
+                else if (ev.shift) tool = "Pick";
+
+                if (ev.type == EventType.MouseDrag)
                     {
-                        BuildCursor();
-                        if (_isPressed) 
+                        var prevFace = _lastFace;
+                        _lastFace = GetFaceHit(scene, ev.mousePosition);
+
+                        if (_lastFace != prevFace)
                         {
-                            if (ev.control)
+                            BuildCursor();
+                            if (_isPressed)
                             {
-                                Debug.Log(String.Format("Ctrl+drag: From {0} to {1}", prevFace, _lastFace));
-                                BuildLoopCursor(prevFace, _lastFace);
-                                scene.Repaint();
-                                //PaintUsingCursor();
+                                if (tool == "Loop")
+                                {
+                                    Debug.Log(String.Format("Ctrl+drag: From {0} to {1}", prevFace, _lastFace));
+                                    BuildLoopCursor(prevFace, _lastFace);
+                                    scene.Repaint();
+                                    //PaintUsingCursor();
+                                }
+                                else if (tool == "Pick")
+                                {
+                                    PickFromSurface(_lastFace);
+                                }
+                                else if (tool == "Brush") PaintUsingCursor();
                             }
-                            else if (ev.shift) 
+                        }
+                        this.Repaint();
+                    }
+                    else if (ev.type == EventType.MouseMove)
+                    {
+                        var prevFace = _lastFace;
+                        _lastFace = GetFaceHit(scene, ev.mousePosition);
+                        if (_lastFace != prevFace)
+                        {
+                            BuildCursor();
+                            //SceneView.RepaintAll();
+                            scene.Repaint();
+                            //Repaint();
+                        }
+                    }
+                    else if (ev.type == EventType.MouseDown)
+                    {
+                        AcquireInput(ev, id);
+                        _isPressed = true;
+                        if (_targetMesh != null)
+                        {
+                            _lastFace = GetFaceHit(scene, ev.mousePosition);
+                            BuildCursor();
+                            if (tool == "Fill")
+                            {
+                                if (_lastFace != -1) _painter.FillPaint(_lastFace, _lastUVpick);
+                            }
+                            else if (tool == "Pick")
                             {
                                 PickFromSurface(_lastFace);
                             }
-                            else PaintUsingCursor(); 
-                        }                        
-                    }                    
-                    this.Repaint();                    
-                } 
-                else if (ev.type == EventType.MouseMove)
-                {
-                    var prevFace = _lastFace;
-                    _lastFace = GetFaceHit(scene, ev.mousePosition);
-                    if (_lastFace != prevFace)
-                    {
-                        BuildCursor();
-                        //SceneView.RepaintAll();
-                        scene.Repaint();
-                        //Repaint();
-                    }                    
-                }
-                else if (ev.type == EventType.MouseDown)
-                {
-                    AcquireInput(ev, id);                    
-                    _isPressed = true;                    
-                    if (_targetMesh != null)
-                    {                       
-                        _lastFace = GetFaceHit(scene, ev.mousePosition);                        
-                        BuildCursor();
-                        if (ev.shift && ev.control) 
-                        {
-                            if (_lastFace != -1) _painter.FillPaint(_lastFace, _lastUVpick);
-                        } 
-                        else if (ev.shift) 
-                        {
-                            PickFromSurface(_lastFace);
+                            else if (tool == "Loop") { }
+                            else PaintUsingCursor();
+                            Repaint();
                         }
-                        else if (ev.control) {} 
-                        else PaintUsingCursor();
-                        Repaint();
                     }
-                }
-                else if (ev.type == EventType.MouseUp)
-                {
-                    if (ev.control)
+                    else if (ev.type == EventType.MouseUp)
                     {
-                        PaintUsingCursor();
+                        if (tool == "Loop")
+                        {
+                            PaintUsingCursor();
+                        }
+                        ReleaseInput(ev);
+                        _isPressed = false;
                     }
-                    ReleaseInput(ev);
-                    _isPressed = false;                    
-                }
 
             }
         }
