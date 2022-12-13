@@ -33,6 +33,8 @@ namespace DAPolyPaint
         private Vector2 _scrollPos;
         private MeshCollider _meshCollider;
         private bool _autoQuads;
+        private string[] _toolNames = new string[] { "Brush", "Fill", "Loop", "Pick" };
+        private int _currTool = -1;
         const float _statusColorBarHeight = 3; 
 
         [MenuItem("DA-Tools/Poly Paint")]
@@ -91,16 +93,31 @@ namespace DAPolyPaint
                 EGL.Space();
                 if (GUILayout.Button("Full Repaint")) _painter.FullRepaint(_lastUVpick);
 
-                EGL.Space();
-                _autoQuads = EGL.ToggleLeft("Auto-detect quads:", _autoQuads);
-                _autoQuads = GUILayout.Toggle(_autoQuads, "Button", "Button");
+                EGL.Space();                
+                GUILayout.Label("Current tool:");
+                _currTool = GUILayout.Toolbar(_currTool, _toolNames);
+                _autoQuads = EGL.ToggleLeft("Auto-detect quads", _autoQuads);
                 EGL.PrefixLabel("Max quad tolerance:");
-                _painter.QuadTolerance = EGL.Slider(_painter.QuadTolerance, 0.1f, 360f);
-                
+                _painter.QuadTolerance = EGL.Slider(_painter.QuadTolerance, 0.1f, 360f);                
             }
 
             EGL.EndScrollView();
 
+        }
+
+        string GetCurrToolName(int index)
+        {
+            if (index >= 0 && index < _toolNames.Length)
+            {
+                return _toolNames[index];
+            }
+            else return "None";
+        }
+
+        void SetCurrTool(string name)
+        {
+            var index = Array.IndexOf(_toolNames, name);
+            _currTool = index;
         }
 
         private void OnGUI_TexturePalette()
