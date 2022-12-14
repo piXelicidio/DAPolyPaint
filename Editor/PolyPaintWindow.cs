@@ -34,7 +34,9 @@ namespace DAPolyPaint
         private MeshCollider _meshCollider;
         private bool _autoQuads;
         private string[] _toolNames = new string[] { "Brush", "Fill", "Loop", "Pick" };
-        private int _currTool = -1;
+        private int _currTool = 0;
+        private bool _anyModifiers = false;
+        private int _savedTool;
         const float _statusColorBarHeight = 3; 
 
         [MenuItem("DA-Tools/Poly Paint")]
@@ -94,8 +96,8 @@ namespace DAPolyPaint
                 if (GUILayout.Button("Full Repaint")) _painter.FullRepaint(_lastUVpick);
 
                 EGL.Space();                
-                GUILayout.Label("Current tool:");
-                _currTool = GUILayout.Toolbar(_currTool, _toolNames);
+                GUILayout.Label("Current tool: (Tip: use Ctrl and/or Shift)");
+                _currTool = GUILayout.Toolbar(_currTool, _toolNames);                
                 _autoQuads = EGL.ToggleLeft("Auto-detect quads", _autoQuads);
                 EGL.PrefixLabel("Max quad tolerance:");
                 _painter.QuadTolerance = EGL.Slider(_painter.QuadTolerance, 0.1f, 360f);                
@@ -340,11 +342,20 @@ namespace DAPolyPaint
                 EditorGUIDrawFrame("PAINT MODE");                
                 Handles.EndGUI();
 
-                var tool = GetCurrToolName();
+                // var tool = GetCurrToolName();
                 //but shiftstates overrides
-                if (ev.shift && ev.control) tool = "Fill";
-                else if (ev.control) tool = "Loop";
-                else if (ev.shift) tool = "Pick";
+                //if (ev.shift && ev.control) tool = "Loop";
+                //else if (ev.control) tool = "Fill";
+                //else if (ev.shift) tool = "Pick";
+                //if (ev.shift && ev.control) _currTool = 2;
+                //else if (ev.control) _currTool = 1;
+                //else if (ev.shift) _currTool = 3;
+
+                OnSceneShiftState(ev);
+
+                var tool = GetCurrToolName();
+
+               
 
                 if (ev.type == EventType.MouseDrag)
                     {
@@ -415,6 +426,32 @@ namespace DAPolyPaint
                         _isPressed = false;
                     }
 
+            }
+        }
+
+        private void OnSceneShiftState(Event ev)
+        {
+            if (ev.shift || ev.control)
+            {
+                if (!_anyModifiers)
+                {
+                    _anyModifiers = true;
+                    //starting modifiers;
+                    _savedTool = _currTool;                    
+                }
+                if (ev.shift && ev.control) _currTool = 2;
+                else if (ev.control) _currTool = 1;
+                else if (ev.shift) _currTool = 3;
+                Repaint();
+            } else
+            {
+                if (_anyModifiers)
+                {
+                    _anyModifiers = false;
+                    _currTool = _savedTool;
+                    //ending modifiers;
+                    Repaint();
+                }
             }
         }
 
