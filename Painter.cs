@@ -26,6 +26,7 @@ namespace DAPolyPaint
         Texture2D _textureData;
         private Mesh _skinAffected;
         private Vector3[] _verticesSkinned;
+        private bool _undoRecording = false;
 
         public Mesh Target { get { return _targetMesh; } }
         public int NumUVCalls { get; private set; }
@@ -100,7 +101,7 @@ namespace DAPolyPaint
             BuildFaceGraph();
 
             Debug.Log("<b>Elapsed:</b> " + (Environment.TickCount - t).ToString() + "ms");
-
+            _undoRecording = true;
         }
 
 
@@ -497,6 +498,38 @@ namespace DAPolyPaint
 
             return result;
         }
+
+        void UndoPause()
+        {
+            _undoRecording = false;
+        }
+
+        void UndoOn()
+        {
+            _undoRecording = true;
+        }
+
+        void UndoDiscardLast()
+        {
+
+        }
+
+        void UndoPushLast()
+        {
+
+        }
+
+        void UndoUndo()
+        {
+
+        }
+
+        void UndoRedo()
+        {
+
+        }
+
+
     }
 
     public class FaceLink

@@ -334,23 +334,15 @@ namespace DAPolyPaint
                 //input events
                 int id = GUIUtility.GetControlID(0xDA3D, FocusType.Passive);
                 var ev = Event.current;
-                //consume input except when doing navigation, view rotation, panning..
-                if (ev.alt || ev.button > 0) return;
-
+                //consume events except when doing navigation, view rotation, panning..
+                if (ev.alt) return;
+                
                 //draw                               
                 Handles.BeginGUI();
                 EditorGUIDrawFrame("PAINT MODE");                
                 Handles.EndGUI();
 
-                // var tool = GetCurrToolName();
-                //but shiftstates overrides
-                //if (ev.shift && ev.control) tool = "Loop";
-                //else if (ev.control) tool = "Fill";
-                //else if (ev.shift) tool = "Pick";
-                //if (ev.shift && ev.control) _currTool = 2;
-                //else if (ev.control) _currTool = 1;
-                //else if (ev.shift) _currTool = 3;
-
+       
                 OnSceneShiftState(ev);
 
                 var tool = GetCurrToolName();
@@ -358,44 +350,46 @@ namespace DAPolyPaint
                
 
                 if (ev.type == EventType.MouseDrag)
-                    {
-                        var prevFace = _lastFace;
-                        _lastFace = GetFaceHit(scene, ev.mousePosition);
+                {
+                    var prevFace = _lastFace;
+                    _lastFace = GetFaceHit(scene, ev.mousePosition);
 
-                        if (_lastFace != prevFace)
-                        {
-                            BuildCursor();
-                            if (_isPressed)
-                            {
-                                if (tool == "Loop")
-                                {
-                                    Debug.Log(String.Format("Ctrl+drag: From {0} to {1}", prevFace, _lastFace));
-                                    BuildLoopCursor(prevFace, _lastFace);
-                                    scene.Repaint();
-                                    //PaintUsingCursor();
-                                }
-                                else if (tool == "Pick")
-                                {
-                                    PickFromSurface(_lastFace);
-                                }
-                                else if (tool == "Brush") PaintUsingCursor();
-                            }
-                        }
-                        this.Repaint();
-                    }
-                    else if (ev.type == EventType.MouseMove)
+                    if (_lastFace != prevFace)
                     {
-                        var prevFace = _lastFace;
-                        _lastFace = GetFaceHit(scene, ev.mousePosition);
-                        if (_lastFace != prevFace)
+                        BuildCursor();
+                        if (_isPressed)
                         {
-                            BuildCursor();
-                            //SceneView.RepaintAll();
-                            scene.Repaint();
-                            //Repaint();
+                            if (tool == "Loop")
+                            {
+                                Debug.Log(String.Format("Ctrl+drag: From {0} to {1}", prevFace, _lastFace));
+                                BuildLoopCursor(prevFace, _lastFace);
+                                scene.Repaint();
+                                //PaintUsingCursor();
+                            }
+                            else if (tool == "Pick")
+                            {
+                                PickFromSurface(_lastFace);
+                            }
+                            else if (tool == "Brush") PaintUsingCursor();
                         }
                     }
-                    else if (ev.type == EventType.MouseDown)
+                    this.Repaint();
+                }
+                else if (ev.type == EventType.MouseMove)
+                {
+                    var prevFace = _lastFace;
+                    _lastFace = GetFaceHit(scene, ev.mousePosition);
+                    if (_lastFace != prevFace)
+                    {
+                        BuildCursor();
+                        //SceneView.RepaintAll();
+                        scene.Repaint();
+                        //Repaint();
+                    }
+                }
+                else if (ev.type == EventType.MouseDown)
+                {
+                    if (ev.button == 0)
                     {
                         AcquireInput(ev, id);
                         _isPressed = true;
@@ -416,7 +410,10 @@ namespace DAPolyPaint
                             Repaint();
                         }
                     }
-                    else if (ev.type == EventType.MouseUp)
+                }
+                else if (ev.type == EventType.MouseUp)
+                {
+                    if (ev.button == 0)
                     {
                         if (tool == "Loop")
                         {
@@ -425,8 +422,33 @@ namespace DAPolyPaint
                         ReleaseInput(ev);
                         _isPressed = false;
                     }
+                }
+                else if (ev.type == EventType.KeyDown)
+                {
+                   if (ev.control && ev.keyCode == KeyCode.Z)
+                    {
+                        //catching Ctrl+Z
+                        Debug.Log("Ctrl+Z: Undo");                        
+                    }
+                   if (!isAllowedInput(ev)) { ev.Use(); }
+                }
+                else if (ev.type == EventType.KeyUp)
+                {
+                   if(!isAllowedInput(ev)) { ev.Use(); }
+                }
 
             }
+        }
+
+        private bool isAllowedInput(Event ev)
+        {
+            return (!ev.control && !ev.shift && !ev.alt)
+                && (isWASDQEF(ev.keyCode));
+        }
+
+        private bool isWASDQEF(KeyCode kc)
+        {
+            return kc == KeyCode.W || kc == KeyCode.A || kc == KeyCode.S || kc == KeyCode.D || kc == KeyCode.Q || kc == KeyCode.E || kc == KeyCode.F;
         }
 
         private void OnSceneShiftState(Event ev)
