@@ -418,6 +418,10 @@ namespace DAPolyPaint
                         if (tool == "Loop")
                         {
                             PaintUsingCursor();
+                        } 
+                        else if (tool == "Brush")
+                        {
+                            _painter.Undo_SaveState();
                         }
                         ReleaseInput(ev);
                         _isPressed = false;
@@ -428,7 +432,8 @@ namespace DAPolyPaint
                    if (ev.control && ev.keyCode == KeyCode.Z)
                     {
                         //catching Ctrl+Z
-                        Debug.Log("Ctrl+Z: Undo");                        
+                        Debug.Log("Ctrl+Z: Undo");
+                        _painter.Undo_Undo();
                     }
                    if (!isAllowedInput(ev)) { ev.Use(); }
                 }

@@ -21,13 +21,14 @@ namespace DAPolyPaint
         int[] _indexedFaces;
         float[] _angles;                //angle of each triangle corners
         List<FaceLink>[] _faceLinks;
+        List<List<Vector2>> _undoLevels;
+        int _undoPos;
 
         int _channel = 0;
         Texture2D _textureData;
         private Mesh _skinAffected;
         private Vector3[] _verticesSkinned;
-        private bool _undoRecording = false;
-
+        
         public Mesh Target { get { return _targetMesh; } }
         public int NumUVCalls { get; private set; }
         public int NumFaces { get { return _triangles.Length / 3; } }
@@ -37,6 +38,7 @@ namespace DAPolyPaint
         public Painter()
         {
             QuadTolerance = 120;
+            _undoLevels = new List<List<Vector2>>();
         }
 
         public void SetMeshAndRebuild(Mesh target, bool skinned, Texture2D texture)
@@ -100,8 +102,10 @@ namespace DAPolyPaint
             CalcAngles();
             BuildFaceGraph();
 
+            Undo_Reset();
+
             Debug.Log("<b>Elapsed:</b> " + (Environment.TickCount - t).ToString() + "ms");
-            _undoRecording = true;
+
         }
 
 
@@ -499,37 +503,52 @@ namespace DAPolyPaint
             return result;
         }
 
-        void UndoPause()
+        public void Undo_Reset()
         {
-            _undoRecording = false;
+            _undoLevels.Clear();
+            _undoPos = -1;
+            Undo_SaveState();
         }
 
-        void UndoOn()
+        public void Undo_SaveState()
         {
-            _undoRecording = true;
+            if (true)
+            {
+                var copy = new List<Vector2>(_UVs);
+                _undoPos++;
+                if (_undoPos == _undoLevels.Count)
+                {
+                    _undoLevels.Add(copy);
+                } else
+                {
+                    _undoLevels[_undoPos] = copy;
+                }
+                
+            } else if (false)
+            {
+                //remove discarded tail
+                //_undoLevels.RemoveRange();
+                var copy = new List<Vector2>(_UVs);
+                _undoLevels.Add(copy);
+            }
+            Debug.Log(String.Format("cursor{0} count{1}", _undoPos, _undoLevels.Count));
         }
 
-        void UndoDiscardLast()
-        {
-
+        public void Undo_Undo()
+        {            
+            if (_undoPos > 0) 
+            {
+                var state = _undoLevels[_undoPos-1];
+                for (int i=0; i<state.Count; i++)
+                {
+                    _UVs[i] = state[i];
+                }
+                _targetMesh.SetUVs(_channel, _UVs);
+                _undoPos--;
+                
+            }
+            Debug.Log(String.Format("cursor{0} count{1}", _undoPos, _undoLevels.Count));
         }
-
-        void UndoPushLast()
-        {
-
-        }
-
-        void UndoUndo()
-        {
-
-        }
-
-        void UndoRedo()
-        {
-
-        }
-
-
     }
 
     public class FaceLink
@@ -562,5 +581,5 @@ namespace DAPolyPaint
             return (v1 == other.v1 || v1 == other.v2 || v2 == other.v1 || v2 == other.v2);
         }
     }
-    
+
 }
