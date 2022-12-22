@@ -23,7 +23,7 @@ namespace DAPolyPaint
         List<FaceLink>[] _faceLinks;
         List<List<Vector2>> _undoLevels;
         int _undoPos;
-
+        private int _undoSequenceCount;
         int _channel = 0;
         Texture2D _textureData;
         private Mesh _skinAffected;
@@ -507,6 +507,7 @@ namespace DAPolyPaint
         {
             _undoLevels.Clear();
             _undoPos = -1;
+            _undoSequenceCount = 0;
             Undo_SaveState();
         }
 
@@ -516,6 +517,7 @@ namespace DAPolyPaint
             {
                 var copy = new List<Vector2>(_UVs);
                 _undoPos++;
+                _undoSequenceCount = 0;
                 if (_undoPos == _undoLevels.Count)
                 {
                     _undoLevels.Add(copy);
@@ -524,12 +526,6 @@ namespace DAPolyPaint
                     _undoLevels[_undoPos] = copy;
                 }
                 
-            } else if (false)
-            {
-                //remove discarded tail
-                //_undoLevels.RemoveRange();
-                var copy = new List<Vector2>(_UVs);
-                _undoLevels.Add(copy);
             }
             Debug.Log(String.Format("cursor{0} count{1}", _undoPos, _undoLevels.Count));
         }
@@ -545,9 +541,24 @@ namespace DAPolyPaint
                 }
                 _targetMesh.SetUVs(_channel, _UVs);
                 _undoPos--;
-                
+                _undoSequenceCount++;
             }
             Debug.Log(String.Format("cursor{0} count{1}", _undoPos, _undoLevels.Count));
+        }
+
+        public void Undo_Redo()
+        {
+            if (_undoSequenceCount>0)
+            {
+                _undoSequenceCount--;
+                _undoPos++;
+                var state = _undoLevels[_undoPos];
+                for (int i=0; i<state.Count; i++)
+                {
+                    _UVs[i] = state[i];
+                }
+                _targetMesh.SetUVs(_channel, _UVs);
+            }
         }
     }
 

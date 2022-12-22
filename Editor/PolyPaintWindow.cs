@@ -399,7 +399,11 @@ namespace DAPolyPaint
                             BuildCursor();
                             if (tool == "Fill")
                             {
-                                if (_lastFace != -1) _painter.FillPaint(_lastFace, _lastUVpick);
+                                if (_lastFace != -1)
+                                {
+                                    _painter.FillPaint(_lastFace, _lastUVpick);
+                                    _painter.Undo_SaveState();
+                                }
                             }
                             else if (tool == "Pick")
                             {
@@ -418,6 +422,7 @@ namespace DAPolyPaint
                         if (tool == "Loop")
                         {
                             PaintUsingCursor();
+                            _painter.Undo_SaveState();
                         } 
                         else if (tool == "Brush")
                         {
@@ -429,11 +434,18 @@ namespace DAPolyPaint
                 }
                 else if (ev.type == EventType.KeyDown)
                 {
-                   if (ev.control && ev.keyCode == KeyCode.Z)
+                   if (ev.control ) 
                     {
-                        //catching Ctrl+Z
-                        Debug.Log("Ctrl+Z: Undo");
-                        _painter.Undo_Undo();
+                        if (ev.keyCode == KeyCode.Z)
+                        { 
+                            //catching Ctrl+Z
+                            Debug.Log("Ctrl+Z: Undo");
+                            _painter.Undo_Undo();
+                        } else if (ev.keyCode == KeyCode.Y)
+                        {
+                            Debug.Log("Ctrl+Y: Redo");
+                            _painter.Undo_Redo();
+                        }
                     }
                    if (!isAllowedInput(ev)) { ev.Use(); }
                 }
