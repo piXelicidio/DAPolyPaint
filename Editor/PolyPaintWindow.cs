@@ -37,13 +37,13 @@ namespace DAPolyPaint
         private int _currTool = 0;
         private bool _anyModifiers = false;
         private int _savedTool;
-        const float _statusColorBarHeight = 3; 
+        const float _statusColorBarHeight = 3;
 
         [MenuItem("DA-Tools/Poly Paint")]
         public static void ShowWindow()
         {
-            var ew  = EditorWindow.GetWindow(typeof(PolyPaintWindow));
-            ew.titleContent = new GUIContent("Poly Paint");            
+            var ew = EditorWindow.GetWindow(typeof(PolyPaintWindow));
+            ew.titleContent = new GUIContent("Poly Paint");
         }
 
         public void CreateGUI()
@@ -90,21 +90,69 @@ namespace DAPolyPaint
             OnGUI_ObjectStatus();
             OnGUI_TexturePalette();
 
+            //Painting tools
             using (new EditorGUI.DisabledScope(!_paintingMode))
             {
                 EGL.Space();
                 if (GUILayout.Button("Full Repaint")) _painter.FullRepaint(_lastUVpick);
 
-                EGL.Space();                
+                EGL.Space();
                 GUILayout.Label("Current tool: (Tip: use Ctrl and/or Shift)");
-                _currTool = GUILayout.Toolbar(_currTool, _toolNames);                
+                _currTool = GUILayout.Toolbar(_currTool, _toolNames);
                 _autoQuads = EGL.ToggleLeft("Auto-detect quads", _autoQuads);
                 EGL.PrefixLabel("Max quad tolerance:");
-                _painter.QuadTolerance = EGL.Slider(_painter.QuadTolerance, 0.1f, 360f);                
+                _painter.QuadTolerance = EGL.Slider(_painter.QuadTolerance, 0.1f, 360f);
+
+                OnGUI_SavePaintedMesh();
             }
 
             EGL.EndScrollView();
 
+        }
+        
+        void OnGUI_SavePaintedMesh()
+        {
+            //saving mesh test
+            if (GUILayout.Button("Save Mesh"))
+            {
+                //save mesh as individual new asset.
+                //SaveMeshToFile(_targetMesh, "TEST_Save", true, false);
+
+
+                // this will replace the FBX with Asset format, making it fail. not good
+                //var ap = AssetDatabase.GetAssetPath(_targetMesh);
+                //Debug.Log(ap);
+                //SaveMeshToFile(_targetMesh, ap, true, false, true);
+
+                //SetDrity method
+                //EditorUtility.SetDirty(_targetMesh);
+                //AssetDatabase.SaveAssets();
+
+                //Saving to Paint component solution
+                //if (_paint != null)
+                //{
+                //    _paint.SavePaintedMesh(_targetMesh);
+                //}
+
+
+                // creates a new assets, reasign the mesh to the separated new asset.
+                //
+                var ap = AssetDatabase.GetAssetPath(_targetMesh);
+                Debug.Log("From: " + ap);
+                var assetMesh = SaveMeshToFile(_targetMesh, "TEST_MESH_sk", true, false);
+                if (assetMesh)
+                {
+                    
+                    Debug.Log("Reaplying duplicated mesh data");
+                    if (_skinned)
+                    {
+                        _targetObject.GetComponent<SkinnedMeshRenderer>().sharedMesh = assetMesh;
+                    } else {
+                        _targetObject.GetComponent<MeshFilter>().sharedMesh = assetMesh;
+                    }
+                    _targetMesh = assetMesh;
+                }
+            }
         }
 
         string GetCurrToolName()
@@ -194,7 +242,7 @@ namespace DAPolyPaint
                 }
                 else
                 {
-                    EGL.HelpBox(check.info, MessageType.Warning);                    
+                    EGL.HelpBox(check.info, MessageType.Warning);
                 }
             }
             EGL.EndFoldoutHeaderGroup();
@@ -213,12 +261,12 @@ namespace DAPolyPaint
             {
                 info += "\nFace: " + _lastFace.ToString();
                 info += "\nSetUVs calls: " + _painter.NumUVCalls.ToString();
-                info += "\nSkinned: " + _skinned.ToString();                
+                info += "\nSkinned: " + _skinned.ToString();
             }
             return (isOk, info);
         }
 
-        
+
 
         void EditorGUIDrawCross(in Vector2 cur, in Color c, int size = 3, int space = 3)
         {
@@ -292,7 +340,7 @@ namespace DAPolyPaint
         }
 
         void EditorGUIDrawFrame(string label, int border = 2)
-        {            
+        {
             var width = Camera.current.pixelWidth;
             var height = Camera.current.pixelHeight;
             var rt = new Rect(0, 0, width, border);
@@ -311,9 +359,9 @@ namespace DAPolyPaint
 
             //label
             rt.width = 200;
-            rt.height = EditorGUIUtility.singleLineHeight; 
-            rt.x = border*2; 
-            rt.y = height - EditorGUIUtility.singleLineHeight - border*2;
+            rt.height = EditorGUIUtility.singleLineHeight;
+            rt.x = border * 2;
+            rt.y = height - EditorGUIUtility.singleLineHeight - border * 2;
             var style = new GUIStyle(EditorStyles.label);
             style.fontSize += 2;
             style.normal.textColor = Color.black;
@@ -336,18 +384,18 @@ namespace DAPolyPaint
                 var ev = Event.current;
                 //consume events except when doing navigation, view rotation, panning..
                 if (ev.alt) return;
-                
+
                 //draw                               
                 Handles.BeginGUI();
-                EditorGUIDrawFrame("PAINT MODE");                
+                EditorGUIDrawFrame("PAINT MODE");
                 Handles.EndGUI();
 
-       
+
                 OnSceneShiftState(ev);
 
                 var tool = GetCurrToolName();
 
-               
+
 
                 if (ev.type == EventType.MouseDrag)
                 {
@@ -423,7 +471,7 @@ namespace DAPolyPaint
                         {
                             PaintUsingCursor();
                             _painter.Undo_SaveState();
-                        } 
+                        }
                         else if (tool == "Brush")
                         {
                             _painter.Undo_SaveState();
@@ -434,10 +482,10 @@ namespace DAPolyPaint
                 }
                 else if (ev.type == EventType.KeyDown)
                 {
-                   if (ev.control ) 
+                    if (ev.control)
                     {
                         if (ev.keyCode == KeyCode.Z)
-                        { 
+                        {
                             //catching Ctrl+Z
                             Debug.Log("Ctrl+Z: Undo");
                             _painter.Undo_Undo();
@@ -447,11 +495,11 @@ namespace DAPolyPaint
                             _painter.Undo_Redo();
                         }
                     }
-                   if (!isAllowedInput(ev)) { ev.Use(); }
+                    if (!isAllowedInput(ev)) { ev.Use(); }
                 }
                 else if (ev.type == EventType.KeyUp)
                 {
-                   if(!isAllowedInput(ev)) { ev.Use(); }
+                    if (!isAllowedInput(ev)) { ev.Use(); }
                 }
 
             }
@@ -476,7 +524,7 @@ namespace DAPolyPaint
                 {
                     _anyModifiers = true;
                     //starting modifiers;
-                    _savedTool = _currTool;                    
+                    _savedTool = _currTool;
                 }
                 if (ev.shift && ev.control) _currTool = 2;
                 else if (ev.control) _currTool = 1;
@@ -500,17 +548,17 @@ namespace DAPolyPaint
             var loopBack = _painter.FindLoop(toFace, fromFace);
             loop.UnionWith(loopBack);
 
-            PaintEditor.PolyCursor.Clear();   
-            
-            foreach (var f in loop )
+            PaintEditor.PolyCursor.Clear();
+
+            foreach (var f in loop)
             {
                 var poly = new PolyFace();
                 _painter.GetFaceVerts(f, poly, _targetObject.transform.localToWorldMatrix);
                 poly.FaceNum = f;
-                PaintEditor.PolyCursor.Add(poly);                                
+                PaintEditor.PolyCursor.Add(poly);
             }
-            Debug.Log("loop faces: "+ PaintEditor.PolyCursor.Count.ToString());
-            
+            Debug.Log("loop faces: " + PaintEditor.PolyCursor.Count.ToString());
+
         }
 
         private void PickFromSurface(int face)
@@ -548,7 +596,7 @@ namespace DAPolyPaint
         {
             PaintEditor.PolyCursor.Clear();
             if (_lastFace != -1)
-            {                
+            {
                 var poly = new PolyFace();
                 _painter.GetFaceVerts(_lastFace, poly, _targetObject.transform.localToWorldMatrix);
                 poly.FaceNum = _lastFace;
@@ -564,7 +612,7 @@ namespace DAPolyPaint
                         poly.FaceNum = quadBro;
                         _painter.GetFaceVerts(quadBro, poly, _targetObject.transform.localToWorldMatrix);
                         PaintEditor.PolyCursor.Add(poly);
-                    } 
+                    }
                 }
                 //adding all linked faces
                 //foreach (var link in _painter.GetFaceLinks(_lastFace))
@@ -592,18 +640,18 @@ namespace DAPolyPaint
                 {
                     _targetMesh = skinned.sharedMesh;
                     _skinned = true;
-                } 
+                }
                 else
                 {
                     _targetMesh = null;
                 }
-                
+
                 var r = _targetObject.GetComponent<Renderer>();
                 if (r != null)
                 {
                     _targetTexture = r.sharedMaterial.mainTexture;
                     _textureData = ToTexture2D(_targetTexture);
-                    
+
                 }
                 else
                 {
@@ -622,16 +670,16 @@ namespace DAPolyPaint
         }
 
         void PrepareObject()
-        {            
+        {
             if (_targetMesh != null)
             {
                 LogMeshInfo(_targetMesh);
                 _painter.SetMeshAndRebuild(_targetMesh, _skinned, _textureData);
                 _meshCollider = _targetObject.GetComponent<MeshCollider>();
-                if (_meshCollider == null) _meshCollider = _targetObject.AddComponent<MeshCollider>();                
+                if (_meshCollider == null) _meshCollider = _targetObject.AddComponent<MeshCollider>();
                 if (!_skinned)
                 {
-                    _meshCollider.sharedMesh = _targetMesh;                  
+                    _meshCollider.sharedMesh = _targetMesh;
                 }
                 else
                 {
@@ -646,7 +694,7 @@ namespace DAPolyPaint
 
                 _paint = _targetObject.GetComponent<Paint>();
                 if (_paint == null) _paint = _targetObject.AddComponent<Paint>();
-                
+
             } else
             {
                 Debug.LogWarning("_targetMeshs should be valid before calling PrepareObject()");
@@ -677,6 +725,33 @@ namespace DAPolyPaint
             return texture2D;
         }
 
+        public Mesh SaveMeshToFile(Mesh mesh, string fileName, bool createNewInstance = false, bool optimizeMesh = false, bool nameIsFullPath = false)
+        {            
+            string filePath = fileName;
+            if (!nameIsFullPath)
+            {
+                // Show the save file dialog and get the file path
+                filePath = EditorUtility.SaveFilePanel("Save Modified Mesh Asset", "Assets/", fileName, "asset");
+            }
+            if (!string.IsNullOrEmpty(filePath))
+            {                
+                if (!nameIsFullPath) filePath = FileUtil.GetProjectRelativePath(filePath);
+                
+                // Create a new instance or use the same mesh
+                Mesh meshToSave = (createNewInstance) ? Instantiate(mesh) as Mesh : mesh;
+
+                if (optimizeMesh) MeshUtility.Optimize(meshToSave);
+
+                // Create the asset and save it to the file
+                Debug.Log("to: " + filePath);
+                AssetDatabase.CreateAsset(meshToSave, filePath);
+                AssetDatabase.SaveAssets();
+                AssetDatabase.Refresh();
+                return(AssetDatabase.LoadAssetAtPath<Mesh>(filePath));
+            }
+            return null;
+        }
+
 
     }
 
@@ -687,6 +762,7 @@ namespace DAPolyPaint
 
     public class PolyList : List<PolyFace> { }
 
+    //With this class we can draw the cursor in the scene view using Gizmos.DrawLine.
     [CustomEditor(typeof(Paint))]
     public class PaintEditor : Editor
     {
@@ -701,6 +777,7 @@ namespace DAPolyPaint
             _currPixelColor = c.linear;
         }
 
+        //Draws
         [DrawGizmo(GizmoType.Selected | GizmoType.NonSelected)]
         static void DrawGizmos(Paint obj, GizmoType gizmoType) //need to be static
         {
