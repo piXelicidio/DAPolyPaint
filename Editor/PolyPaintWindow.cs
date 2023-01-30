@@ -4,7 +4,7 @@ using UnityEngine;
 using UnityEditor;
 using EGL = UnityEditor.EditorGUILayout;
 using System;
-using System.Linq;
+using System.IO;
 using System.Text;
 
 namespace DAPolyPaint
@@ -37,7 +37,11 @@ namespace DAPolyPaint
         private int _currTool = 0;
         private bool _anyModifiers = false;
         private int _savedTool;
+        private bool _autoSave = true;
         const float _statusColorBarHeight = 3;
+        public readonly Color ColorStatusReady = Color.green;
+        public readonly Color ColorStatusPainting = new Color(1, 0.4f, 0);//orange
+        public readonly Color ColorStatusError = Color.red;
 
         [MenuItem("DA-Tools/Poly Paint")]
         public static void ShowWindow()
@@ -80,6 +84,25 @@ namespace DAPolyPaint
                 {
                     if (GUILayout.Button("STOP PAINT MODE"))
                     {
+                        if (_autoSave)
+                        {
+                            SaveMeshAsset();
+                        } else
+                        {
+                            var discard = EditorUtility.DisplayDialog("Discard changes?",
+                                "Discard all changes from this paint session?", "Discard", "Apply");
+                            if (discard)
+                            {
+                                _painter.RestoreOldMesh();
+                            } else
+                            {
+                               if (!SaveMeshAsset())
+                                {
+                                    _painter.RestoreOldMesh();
+                                };
+                            }
+
+                        }
                         _paintingMode = false;
                         SceneView.lastActiveSceneView.Repaint();
                         PaintEditor.PaintMode = false;
@@ -110,49 +133,108 @@ namespace DAPolyPaint
 
         }
         
+        //GUI section about saving the changes
         void OnGUI_SavePaintedMesh()
         {
             //saving mesh test
-            if (GUILayout.Button("Save Mesh"))
+            _autoSave = EGL.ToggleLeft("Auto-save", _autoSave);
+            using (new EditorGUI.DisabledScope(_autoSave))
             {
-                //save mesh as individual new asset.
-                //SaveMeshToFile(_targetMesh, "TEST_Save", true, false);
-
-
-                // this will replace the FBX with Asset format, making it fail. not good
-                //var ap = AssetDatabase.GetAssetPath(_targetMesh);
-                //Debug.Log(ap);
-                //SaveMeshToFile(_targetMesh, ap, true, false, true);
-
-                //SetDrity method
-                //EditorUtility.SetDirty(_targetMesh);
-                //AssetDatabase.SaveAssets();
-
-                //Saving to Paint component solution
-                //if (_paint != null)
-                //{
-                //    _paint.SavePaintedMesh(_targetMesh);
-                //}
-
-
-                // creates a new assets, reasign the mesh to the separated new asset.
-                //
-                var ap = AssetDatabase.GetAssetPath(_targetMesh);
-                Debug.Log("From: " + ap);
-                var assetMesh = SaveMeshToFile(_targetMesh, "TEST_MESH_sk", true, false);
-                if (assetMesh)
+                EGL.Space();
+                if (GUILayout.Button(new GUIContent("Save Changes", "Save the modified painted mesh")))
                 {
+                    SaveMeshAsset();
+                }
+            }            
+        }
+
+
+        //Try to apply the changes to the mesh, return false if the process is aborted.
+        public bool SaveMeshAsset(bool optimizeMesh = false)
+        {
+            var currPath = AssetDatabase.GetAssetPath(_targetMesh);
+
+            if (string.IsNullOrEmpty(currPath))
+            {
+                Debug.Log("No asset path found for mesh");
+                return false;
+            }
+            else
+            {
+                var format = Path.GetExtension(currPath);                
+
+                if (optimizeMesh)
+                {                    
+                   // MeshUtility.Optimize(mesh);
+                }
+
+                //if not a separated asset already, save as new asset
+                var reassign = false;
+                string newPath = "";
+                if (format != ".asset")
+                {
+                    var meshCompName = (_skinned) ? "SkinnedMeshRenderer" : "MeshFilter";
+                    var userOk = EditorUtility.DisplayDialog("Saving modified mesh...",
+                        "Since the original asset is a "+format+" the mesh will be saved as a new asset, and the " + meshCompName+" reference updated.",
+                        "OK", "Cancel");
+                    if (!userOk) return false;
                     
-                    Debug.Log("Reaplying duplicated mesh data");
+                    newPath = Path.GetDirectoryName(currPath) + "/" + Path.GetFileNameWithoutExtension(currPath) + "_pnt.asset";
+                    newPath = AssetDatabase.GenerateUniqueAssetPath(newPath);
+                    var mesh = Instantiate(_targetMesh) as Mesh;
+                    AssetDatabase.CreateAsset(mesh, newPath);                    
+                    reassign = true; 
+                } else
+                {
+                    EditorUtility.SetDirty(_targetMesh);
+                }
+                AssetDatabase.SaveAssets();
+                AssetDatabase.Refresh();
+                if (reassign)
+                {
+                    _targetMesh = AssetDatabase.LoadAssetAtPath<Mesh>(newPath);
                     if (_skinned)
                     {
-                        _targetObject.GetComponent<SkinnedMeshRenderer>().sharedMesh = assetMesh;
-                    } else {
-                        _targetObject.GetComponent<MeshFilter>().sharedMesh = assetMesh;
+                        _targetObject.GetComponent<SkinnedMeshRenderer>().sharedMesh = _targetMesh;
                     }
-                    _targetMesh = assetMesh;
+                    else
+                    {
+                        _targetObject.GetComponent<MeshFilter>().sharedMesh = _targetMesh;
+                    }
                 }
+                return true;
             }
+        }
+
+        public Mesh SaveMeshToFile(Mesh mesh, string fileName, bool createNewInstance = false, bool optimizeMesh = false, bool nameIsFullPath = false)
+        {
+            string filePath = fileName;
+            if (!nameIsFullPath)
+            {
+                // Show the save file dialog and get the file path
+                filePath = EditorUtility.SaveFilePanel("Save Modified Mesh Asset", "Assets/", fileName, "asset");
+            }
+            if (!string.IsNullOrEmpty(filePath))
+            {
+                if (!nameIsFullPath) filePath = FileUtil.GetProjectRelativePath(filePath);
+
+                // Create a new instance or use the same mesh
+                Mesh meshToSave = (createNewInstance) ? Instantiate(mesh) as Mesh : mesh;
+
+                if (optimizeMesh) MeshUtility.Optimize(meshToSave);
+
+                // Create the asset and save it to the file
+
+
+                AssetDatabase.CreateAsset(meshToSave, filePath);
+                AssetDatabase.SaveAssets();
+                AssetDatabase.Refresh();
+                Debug.Log("to: " + filePath);
+                Type assetType = AssetDatabase.GetMainAssetTypeAtPath(filePath);
+                Debug.Log("Type: " + assetType);
+                return (AssetDatabase.LoadAssetAtPath<Mesh>(filePath));
+            }
+            return null;
         }
 
         string GetCurrToolName()
@@ -223,11 +305,11 @@ namespace DAPolyPaint
             Color statusColor;
             if (!check.isOk)
             {
-                statusColor = Color.yellow;
+                statusColor = ColorStatusError;
             }
             else
             {
-                if (_paintingMode) statusColor = Color.red; else statusColor = Color.green;
+                if (_paintingMode) statusColor = ColorStatusPainting; else statusColor = ColorStatusReady;
             }
             EditorGUI.DrawRect(statusColorRect, statusColor);
             var s = "";
@@ -259,8 +341,8 @@ namespace DAPolyPaint
             info += "\nTex: " + s;
             if (isOk)
             {
-                info += "\nFace: " + _lastFace.ToString();
-                info += "\nSetUVs calls: " + _painter.NumUVCalls.ToString();
+                //info += "\nFace: " + _lastFace.ToString();
+                //info += "\nSetUVs calls: " + _painter.NumUVCalls.ToString();
                 info += "\nSkinned: " + _skinned.ToString();
             }
             return (isOk, info);
@@ -344,7 +426,7 @@ namespace DAPolyPaint
             var width = Camera.current.pixelWidth;
             var height = Camera.current.pixelHeight;
             var rt = new Rect(0, 0, width, border);
-            Color c = Color.red;
+            Color c = ColorStatusPainting;
             EditorGUI.DrawRect(rt, c);
             rt.height = height;
             rt.width = border;
@@ -368,7 +450,7 @@ namespace DAPolyPaint
             EditorGUI.LabelField(rt, label, style);
             rt.x -= 1;
             rt.y -= 1;
-            style.normal.textColor = Color.red;
+            style.normal.textColor = ColorStatusPainting;
             EditorGUI.LabelField(rt, label, style);
         }
 
@@ -725,32 +807,8 @@ namespace DAPolyPaint
             return texture2D;
         }
 
-        public Mesh SaveMeshToFile(Mesh mesh, string fileName, bool createNewInstance = false, bool optimizeMesh = false, bool nameIsFullPath = false)
-        {            
-            string filePath = fileName;
-            if (!nameIsFullPath)
-            {
-                // Show the save file dialog and get the file path
-                filePath = EditorUtility.SaveFilePanel("Save Modified Mesh Asset", "Assets/", fileName, "asset");
-            }
-            if (!string.IsNullOrEmpty(filePath))
-            {                
-                if (!nameIsFullPath) filePath = FileUtil.GetProjectRelativePath(filePath);
-                
-                // Create a new instance or use the same mesh
-                Mesh meshToSave = (createNewInstance) ? Instantiate(mesh) as Mesh : mesh;
 
-                if (optimizeMesh) MeshUtility.Optimize(meshToSave);
 
-                // Create the asset and save it to the file
-                Debug.Log("to: " + filePath);
-                AssetDatabase.CreateAsset(meshToSave, filePath);
-                AssetDatabase.SaveAssets();
-                AssetDatabase.Refresh();
-                return(AssetDatabase.LoadAssetAtPath<Mesh>(filePath));
-            }
-            return null;
-        }
 
 
     }

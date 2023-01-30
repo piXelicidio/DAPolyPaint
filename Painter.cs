@@ -28,7 +28,8 @@ namespace DAPolyPaint
         Texture2D _textureData;
         private Mesh _skinAffected;
         private Vector3[] _verticesSkinned;
-        
+        private MeshCopy _oldMesh;
+
         public Mesh Target { get { return _targetMesh; } }
         public int NumUVCalls { get; private set; }
         public int NumFaces { get { return _triangles.Length / 3; } }
@@ -41,6 +42,8 @@ namespace DAPolyPaint
             _undoLevels = new List<List<Vector2>>();
         }
 
+        //Set the mesh to be painted and rebuild the internal data structures.
+        //THIS NEED to be called first before any other painting function. TODO: maybe put in the constructor?
         public void SetMeshAndRebuild(Mesh target, bool skinned, Texture2D texture)
         {
             _targetMesh = target;
@@ -50,37 +53,44 @@ namespace DAPolyPaint
             RebuildMeshForPainting();            
         }
 
+        //Rebuild the mesh data to get ready for painting.
         void RebuildMeshForPainting()
         {
             var t = Environment.TickCount;
             Debug.Log("<b>Preparing mesh...</b> ");
             var m = _targetMesh;
-            var tris = m.triangles;
-            var vertices = m.vertices;
-            var UVs = m.uv; //channel 0 
-            var normals = m.normals;
-            var boneWeights = m.boneWeights;
+
+            //var tris = m.triangles;
+            //var vertices = m.vertices;
+            //var UVs = m.uv; //channel 0 
+            //var normals = m.normals;
+            //var boneWeights = m.boneWeights;
+
+            _oldMesh = new MeshCopy(m);
+
             var newVertices = new List<Vector3>();
             var newUVs = new List<Vector2>();
             var newTris = new List<int>();
             var newNormals = new List<Vector3>();
-            var newBW = new BoneWeight[tris.Length];
+            var newBW = new BoneWeight[_oldMesh.tris.Length];
             //no more shared vertices, each triangle will have its own 3 vertices.
-            for (int i = 0; i < tris.Length; i++)
+            for (int i = 0; i < _oldMesh.tris.Length; i++)
             {
-                var idx = tris[i];
+                var idx = _oldMesh.tris[i];
                 newTris.Add(i);
-                newVertices.Add(vertices[idx]);
-                newNormals.Add(normals[idx]);
+                newVertices.Add(_oldMesh.vertices[idx]);
+                newNormals.Add(_oldMesh.normals[idx]);
                 //also UVs but the 3 values will be the same
-                newUVs.Add(UVs[tris[i - i % 3]]);
+                newUVs.Add(_oldMesh.UVs[_oldMesh.tris[i - i % 3]]);
 
                 if (_skinned)
                 {
-                    newBW[i] = boneWeights[idx];
+                    newBW[i] = _oldMesh.boneWeights[idx];
                 }
             }
-            
+
+            //updating mesh with new distribution of vertices
+            m.Clear();
             if (m.subMeshCount > 1) m.subMeshCount = 1; //NOT support for multiple submeshes.
             m.SetVertices(newVertices);
             m.SetUVs(_channel, newUVs);            
@@ -106,6 +116,13 @@ namespace DAPolyPaint
 
             Debug.Log("<b>Elapsed:</b> " + (Environment.TickCount - t).ToString() + "ms");
 
+        }
+
+        //After calling RestoreOldMesh, all other painting functions will fail, unless you call RebuildMeshForPainting again.
+        public void RestoreOldMesh()
+        {
+            Debug.Log("Restoring mesh...");
+            _oldMesh.PasteTo(_targetMesh);
         }
 
 
@@ -143,7 +160,7 @@ namespace DAPolyPaint
             _indexedVerts = sharedVerts.ToArray();
 
             //Tested with casual_Female_G model when from 4k verts to originallly 824 verts, just like 3ds Max version.
-            Debug.Log(String.Format("NumVerts before:{0} after:{1}", NumVerts, sharedVerts.Count));
+            //Debug.Log(String.Format("NumVerts before:{0} after:{1}", NumVerts, sharedVerts.Count));
         }
 
         private void CalcAngles()
@@ -527,7 +544,6 @@ namespace DAPolyPaint
                 }
                 
             }
-            Debug.Log(String.Format("cursor{0} count{1}", _undoPos, _undoLevels.Count));
         }
 
         public void Undo_Undo()
@@ -558,6 +574,37 @@ namespace DAPolyPaint
                     _UVs[i] = state[i];
                 }
                 _targetMesh.SetUVs(_channel, _UVs);
+            }
+        }
+    }
+
+    public class MeshCopy
+    {
+        public int[] tris;
+        public Vector3[] vertices;
+        public Vector2[] UVs; //channel 0 
+        public Vector3[] normals;
+        public BoneWeight[] boneWeights;
+        
+        public MeshCopy(Mesh m)
+        {
+            tris = m.triangles;
+            vertices = m.vertices;
+            UVs = m.uv;
+            normals = m.normals;
+            boneWeights = m.boneWeights;            
+        }
+
+        public void PasteTo(Mesh m)
+        {
+            if (m != null)
+            {
+                m.Clear();
+                m.SetVertices(new List<Vector3>(vertices)); //  order is important.
+                m.SetUVs(0, new List<Vector2>(UVs));
+                m.SetTriangles(new List<int>(tris), 0);
+                m.SetNormals(new List<Vector3>(normals));
+                m.boneWeights = boneWeights;
             }
         }
     }
