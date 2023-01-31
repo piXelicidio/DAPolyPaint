@@ -3,9 +3,9 @@
 3D Polygon Painter tool for Unity. Alternative to [pX Poly Paint for 3ds Max](https://github.com/piXelicidio/pxMaxScript/tree/master/PolyPainter)
 
 ![screenshot](da-polypaint-screenshot.jpg)
----
+
 *Installing:*
-- Copy **PAPolyPaint** folder anywhere inside your Unity project assets.
+- Copy **DAPolyPaint** folder anywhere inside your Unity project assets.
 - Open the tool with Unity Main **Menu > DA-Tools > Poly Paint**
 ---
 *Using:*
