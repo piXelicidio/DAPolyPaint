@@ -732,8 +732,15 @@ namespace DAPolyPaint
                 if (r != null)
                 {
                     _targetTexture = r.sharedMaterial.mainTexture;
-                    _textureData = ToTexture2D(_targetTexture);
-
+                    if (_targetTexture != null)
+                    {
+                        _textureData = ToTexture2D(_targetTexture);
+                    } else
+                    {
+                        _targetTexture = null;
+                        _textureData = null;
+                    }
+                    
                 }
                 else
                 {
