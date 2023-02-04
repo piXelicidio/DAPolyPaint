@@ -779,6 +779,8 @@ namespace DAPolyPaint
                     _meshCollider.sharedMesh = snapshot;
                     _painter.SetSkinAffected(snapshot);
                 }
+                _meshCollider.hideFlags = HideFlags.HideInHierarchy;
+                Debug.Log("MeshCollider.name: " + _meshCollider.name);
                 _lastFace = -1;
 
                 _paint = _targetObject.GetComponent<Paint>();
