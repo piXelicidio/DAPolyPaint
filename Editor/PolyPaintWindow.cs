@@ -19,6 +19,8 @@ namespace DAPolyPaint
         bool _isPressed = false;
 
         GameObject _targetObject;
+        GameObject _dummyObject;
+        MeshCollider _dummyCollider;
         Mesh _targetMesh;
         private bool _skinned;
         Texture _targetTexture;
@@ -27,7 +29,7 @@ namespace DAPolyPaint
 
         RaycastHit _lastHit;
         int _lastFace;
-        private Paint _paint;
+        private PaintCursor _paintCursor;
         Vector2 _lastUVpick;
         private Color _lastPixelColor;
         private Vector2 _scrollPos;
@@ -106,6 +108,7 @@ namespace DAPolyPaint
                         _paintingMode = false;
                         SceneView.lastActiveSceneView.Repaint();
                         PaintEditor.PaintMode = false;
+                        DestroyImmediate(_dummyObject);
                     }
                 }
             }
@@ -406,7 +409,8 @@ namespace DAPolyPaint
                 _currMousePosCam.y = sv.camera.pixelHeight - _currMousePosCam.y;
                 var ray = sv.camera.ScreenPointToRay(_currMousePosCam);
 
-                var coll = _targetObject.GetComponent<MeshCollider>();
+                //var coll = _targetObject.GetComponent<MeshCollider>();
+                var coll = _dummyCollider;
                 if (coll)
                 {
                     if (coll.Raycast(ray, out _lastHit, 100f))
@@ -762,13 +766,13 @@ namespace DAPolyPaint
         {
             if (_targetMesh != null)
             {
+                (_dummyObject, _dummyCollider) = CreateDummy();
+                
                 LogMeshInfo(_targetMesh);
                 _painter.SetMeshAndRebuild(_targetMesh, _skinned, _textureData);
-                _meshCollider = _targetObject.GetComponent<MeshCollider>();
-                if (_meshCollider == null) _meshCollider = _targetObject.AddComponent<MeshCollider>();
                 if (!_skinned)
                 {
-                    _meshCollider.sharedMesh = _targetMesh;
+                    _dummyCollider.sharedMesh = _targetMesh;
                 }
                 else
                 {
@@ -776,21 +780,35 @@ namespace DAPolyPaint
                     var smr = _targetObject.GetComponent<SkinnedMeshRenderer>();
                     var snapshot = new Mesh();
                     smr.BakeMesh(snapshot, true);
-                    _meshCollider.sharedMesh = snapshot;
+                    _dummyCollider.sharedMesh = snapshot; 
                     _painter.SetSkinAffected(snapshot);
                 }
-                _meshCollider.hideFlags = HideFlags.HideInHierarchy;
-                Debug.Log("MeshCollider.name: " + _meshCollider.name);
                 _lastFace = -1;
 
-                _paint = _targetObject.GetComponent<Paint>();
-                if (_paint == null) _paint = _targetObject.AddComponent<Paint>();
-
-            } else
+                //_paintCursor = _targetObject.GetComponent<PaintCursor>();
+                //if (_paintCursor == null) _paintCursor = _targetObject.AddComponent<PaintCursor>();
+                _paintCursor = _dummyObject.AddComponent<PaintCursor>();
+            }
+            else
             {
                 Debug.LogWarning("_targetMeshs should be valid before calling PrepareObject()");
             }
         }
+
+        //Creates a dummy object to be used as a raycast target
+        (GameObject, MeshCollider) CreateDummy()
+        {
+            var dummy = new GameObject("Dummy");
+            dummy.hideFlags = HideFlags.DontSave;
+            dummy.transform.parent = _targetObject.transform;
+            dummy.transform.localPosition = Vector3.zero;
+            dummy.transform.localRotation = Quaternion.identity;
+            dummy.transform.localScale = Vector3.one;
+            var collider = dummy.AddComponent<MeshCollider>();
+            collider.hideFlags = HideFlags.HideInHierarchy; 
+            return (dummy, collider);
+        }
+
 
         void LogMeshInfo(Mesh m)
         {
@@ -830,7 +848,7 @@ namespace DAPolyPaint
     public class PolyList : List<PolyFace> { }
 
     //With this class we can draw the cursor in the scene view using Gizmos.DrawLine.
-    [CustomEditor(typeof(Paint))]
+    [CustomEditor(typeof(PaintCursor))]
     public class PaintEditor : Editor
     {
         static Color _currPixelColor;
@@ -846,7 +864,7 @@ namespace DAPolyPaint
 
         //Draws
         [DrawGizmo(GizmoType.Selected | GizmoType.NonSelected)]
-        static void DrawGizmos(Paint obj, GizmoType gizmoType) //need to be static
+        static void DrawGizmos(PaintCursor obj, GizmoType gizmoType) //need to be static
         {
             if (PaintMode && _polyCursor.Count > 0)
             {

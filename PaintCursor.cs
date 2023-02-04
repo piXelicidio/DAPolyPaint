@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace DAPolyPaint
 {
-    public class Paint : MonoBehaviour
+    public class PaintCursor : MonoBehaviour
     {
     }
 }

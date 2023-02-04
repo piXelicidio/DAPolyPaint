@@ -395,6 +395,7 @@ namespace DAPolyPaint
             return _faceLinks[face]; 
         }
 
+        //TODO: looks that something that should go in the "create" method
         public void SetSkinAffected(Mesh snapshot)
         {
             _skinAffected = snapshot;
