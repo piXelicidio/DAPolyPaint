@@ -62,7 +62,8 @@ namespace DAPolyPaint
 
         public void OnDestroy()
         {
-            SceneView.duringSceneGui -= OnSceneGUI;
+            if (_paintingMode) StopPaintMode();
+            SceneView.duringSceneGui -= OnSceneGUI;            
         }
         
         void StartPaintMode()
@@ -725,6 +726,8 @@ namespace DAPolyPaint
 
         void OnSelectionChange()
         {
+            if (_paintingMode) return;
+            
             _targetObject = Selection.activeGameObject;
             _skinned = false;
             if (_targetObject != null)
