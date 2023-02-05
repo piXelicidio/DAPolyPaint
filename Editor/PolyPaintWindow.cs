@@ -41,6 +41,7 @@ namespace DAPolyPaint
         private int _savedTool;
         private bool _autoSave = true;
         const float _statusColorBarHeight = 3;
+        private const string DummyName = "$pp_dummy$";
         public readonly Color ColorStatusReady = Color.green;
         public readonly Color ColorStatusPainting = new Color(1, 0.4f, 0);//orange
         public readonly Color ColorStatusError = Color.red;
@@ -63,6 +64,45 @@ namespace DAPolyPaint
         {
             SceneView.duringSceneGui -= OnSceneGUI;
         }
+        
+        void StartPaintMode()
+        {
+            PrepareObject();
+            _paintingMode = true;
+            _lastPixelColor = _painter.GetTextureColor(_lastUVpick);
+            PaintEditor.SetPixelColor(_lastPixelColor);
+            SceneView.lastActiveSceneView.Repaint();
+            PaintEditor.PaintMode = true;
+        }
+
+        void StopPaintMode()
+        {
+            if (_autoSave)
+            {
+                SaveMeshAsset();
+            }
+            else
+            {
+                var discard = EditorUtility.DisplayDialog("Discard changes?",
+                    "Discard all changes from this paint session?", "Discard", "Apply");
+                if (discard)
+                {
+                    _painter.RestoreOldMesh();
+                }
+                else
+                {
+                    if (!SaveMeshAsset())
+                    {
+                        _painter.RestoreOldMesh();
+                    };
+                }
+
+            }
+            _paintingMode = false;
+            SceneView.lastActiveSceneView.Repaint();
+            PaintEditor.PaintMode = false;
+            //DestroyImmediate(_dummyObject);
+        }
 
         //Editor Window User Interface - PolyPaint --------------------------------
         void OnGUI()
@@ -74,41 +114,14 @@ namespace DAPolyPaint
                 {
                     if (GUILayout.Button("START PAINT MODE"))
                     {
-                        PrepareObject();
-                        _paintingMode = true;
-                        _lastPixelColor = _painter.GetTextureColor(_lastUVpick);
-                        PaintEditor.SetPixelColor(_lastPixelColor);
-                        SceneView.lastActiveSceneView.Repaint();
-                        PaintEditor.PaintMode = true;
+                        StartPaintMode();
                     }
                 }
                 else
                 {
                     if (GUILayout.Button("STOP PAINT MODE"))
                     {
-                        if (_autoSave)
-                        {
-                            SaveMeshAsset();
-                        } else
-                        {
-                            var discard = EditorUtility.DisplayDialog("Discard changes?",
-                                "Discard all changes from this paint session?", "Discard", "Apply");
-                            if (discard)
-                            {
-                                _painter.RestoreOldMesh();
-                            } else
-                            {
-                               if (!SaveMeshAsset())
-                                {
-                                    _painter.RestoreOldMesh();
-                                };
-                            }
-
-                        }
-                        _paintingMode = false;
-                        SceneView.lastActiveSceneView.Repaint();
-                        PaintEditor.PaintMode = false;
-                        DestroyImmediate(_dummyObject);
+                        StopPaintMode();
                     }
                 }
             }
@@ -765,8 +778,8 @@ namespace DAPolyPaint
         void PrepareObject()
         {
             if (_targetMesh != null)
-            {
-                (_dummyObject, _dummyCollider) = CreateDummy();
+            {                
+                (_dummyObject, _dummyCollider) = GetDummy(_targetObject);
                 
                 LogMeshInfo(_targetMesh);
                 _painter.SetMeshAndRebuild(_targetMesh, _skinned, _textureData);
@@ -783,11 +796,7 @@ namespace DAPolyPaint
                     _dummyCollider.sharedMesh = snapshot; 
                     _painter.SetSkinAffected(snapshot);
                 }
-                _lastFace = -1;
-
-                //_paintCursor = _targetObject.GetComponent<PaintCursor>();
-                //if (_paintCursor == null) _paintCursor = _targetObject.AddComponent<PaintCursor>();
-                _paintCursor = _dummyObject.AddComponent<PaintCursor>();
+                _lastFace = -1;                
             }
             else
             {
@@ -796,15 +805,32 @@ namespace DAPolyPaint
         }
 
         //Creates a dummy object to be used as a raycast target
-        (GameObject, MeshCollider) CreateDummy()
+        (GameObject, MeshCollider) GetDummy(GameObject obj)
         {
-            var dummy = new GameObject("Dummy");
+            //see first if obj already have a child with DummyName
+            GameObject dummy;
+            var trans = obj.transform.Find(DummyName);
+            if (trans != null)
+            {
+                dummy = trans.gameObject;
+            }
+            else
+            {
+                dummy = new GameObject(DummyName);
+                dummy.transform.parent = obj.transform;                
+            }
             dummy.hideFlags = HideFlags.DontSave;
-            dummy.transform.parent = _targetObject.transform;
             dummy.transform.localPosition = Vector3.zero;
             dummy.transform.localRotation = Quaternion.identity;
             dummy.transform.localScale = Vector3.one;
-            var collider = dummy.AddComponent<MeshCollider>();
+
+            var collider = dummy.GetComponent<MeshCollider>();
+            if (collider == null) collider = dummy.AddComponent<MeshCollider>();
+
+            _paintCursor = dummy.GetComponent<PaintCursor>();
+            if (_paintCursor == null) _paintCursor = dummy.AddComponent<PaintCursor>();
+            
+
             collider.hideFlags = HideFlags.HideInHierarchy; 
             return (dummy, collider);
         }

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography;
 using UnityEngine;
 
 
@@ -577,6 +578,8 @@ namespace DAPolyPaint
                 _targetMesh.SetUVs(_channel, _UVs);
             }
         }
+
+
     }
 
     public class MeshCopy
@@ -609,6 +612,8 @@ namespace DAPolyPaint
             }
         }
     }
+
+    
 
     public class FaceLink
     {
