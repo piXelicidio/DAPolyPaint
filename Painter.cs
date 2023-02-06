@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography;
 using UnityEngine;
 
 
@@ -395,6 +396,7 @@ namespace DAPolyPaint
             return _faceLinks[face]; 
         }
 
+        //TODO: looks that something that should go in the "create" method
         public void SetSkinAffected(Mesh snapshot)
         {
             _skinAffected = snapshot;
@@ -576,6 +578,8 @@ namespace DAPolyPaint
                 _targetMesh.SetUVs(_channel, _UVs);
             }
         }
+
+
     }
 
     public class MeshCopy
@@ -608,6 +612,8 @@ namespace DAPolyPaint
             }
         }
     }
+
+    
 
     public class FaceLink
     {
