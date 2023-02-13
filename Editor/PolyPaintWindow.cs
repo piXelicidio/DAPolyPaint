@@ -352,7 +352,30 @@ namespace DAPolyPaint
             var info = "";
             var s = "";
             var isOk = true;
-            if (_targetMesh == null) { s = "NOT FOUND"; isOk = false; } else s = "ok";
+            if (_targetMesh == null) 
+            {
+                s = "NOT FOUND"; 
+                isOk = false;
+                if (_targetObject != null)
+                {
+                    var childNameWithMesh = "";
+                    var m = _targetObject.GetComponentInChildren<MeshRenderer>();
+                    if (m == null)
+                    {
+                        var ms = _targetObject.GetComponentInChildren<SkinnedMeshRenderer>();
+                        if (ms!=null) childNameWithMesh = ms.gameObject.name;
+                    } else
+                    {
+                        childNameWithMesh = m.gameObject.name;
+                    }
+                    if (childNameWithMesh != "")
+                    {
+                        s += " (But detected on childs)";
+                    }
+                }
+                
+            }
+            else s = "ok";
             info += "Mesh: " + s;
             if (_targetTexture == null) { s = "NOT FOUND"; isOk = false; } else s = _targetTexture.name;
             info += "\nTex: " + s;
