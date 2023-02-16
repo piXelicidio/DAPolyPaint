@@ -49,13 +49,14 @@ namespace DAPolyPaint
         [MenuItem("DA-Tools/Poly Paint")]
         public static void ShowWindow()
         {
-            var ew = EditorWindow.GetWindow(typeof(PolyPaintWindow));
+            var ew =(PolyPaintWindow) EditorWindow.GetWindow(typeof(PolyPaintWindow));
+            if (ew._painter == null) ew._painter = new Painter();
             ew.titleContent = new GUIContent("Poly Paint");
         }
 
         public void CreateGUI()
-        {
-            _painter = new Painter();
+        {     
+            if (_painter==null) _painter = new Painter();
             SceneView.duringSceneGui += OnSceneGUI;
             this.OnSelectionChange();
         }
@@ -134,14 +135,16 @@ namespace DAPolyPaint
             using (new EditorGUI.DisabledScope(!_paintingMode))
             {
                 EGL.Space();
-                if (GUILayout.Button("Full Repaint")) _painter.FullRepaint(_lastUVpick);
-
+                if (_painter != null)
+                {
+                    if (GUILayout.Button("Full Repaint")) _painter.FullRepaint(_lastUVpick);
+                }
                 EGL.Space();
                 GUILayout.Label("Current tool: (Tip: use Ctrl and/or Shift)");
                 _currTool = GUILayout.Toolbar(_currTool, _toolNames);
                 _autoQuads = EGL.ToggleLeft("Auto-detect quads", _autoQuads);
                 EGL.PrefixLabel("Max quad tolerance:");
-                _painter.QuadTolerance = EGL.Slider(_painter.QuadTolerance, 0.1f, 360f);
+                if (_painter!=null)  _painter.QuadTolerance = EGL.Slider(_painter.QuadTolerance, 0.1f, 360f);
 
                 OnGUI_SavePaintedMesh();
             }
