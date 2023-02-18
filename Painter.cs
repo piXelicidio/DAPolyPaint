@@ -92,6 +92,7 @@ namespace DAPolyPaint
 
             //updating mesh with new distribution of vertices
             m.Clear();
+            if (newVertices.Count>60000) m.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
             if (m.subMeshCount > 1) m.subMeshCount = 1; //NOT support for multiple submeshes.
             m.SetVertices(newVertices);
             m.SetUVs(_channel, newUVs);            
@@ -108,14 +109,24 @@ namespace DAPolyPaint
                 m.boneWeights = newBW;                
             }
 
-            
+
+            Debug.Log("<b>Rebuild, Elapsed:</b> " + (Environment.TickCount - t).ToString() + "ms");
+            t = Environment.TickCount;
+
             Indexify();
+
+            Debug.Log("<b>Indexify, Elapsed:</b> " + (Environment.TickCount - t).ToString() + "ms");
+            t = Environment.TickCount;
+
             CalcAngles();
-            BuildFaceGraph();
+
+            Debug.Log("<b>CalcAngles, Elapsed:</b> " + (Environment.TickCount - t).ToString() + "ms");
+            t = Environment.TickCount;
+            //BuildFaceGraph();
 
             Undo_Reset();
 
-            Debug.Log("<b>Elapsed:</b> " + (Environment.TickCount - t).ToString() + "ms");
+            Debug.Log("<b>BuildFaceGraph, Elapsed:</b> " + (Environment.TickCount - t).ToString() + "ms");
 
         }
 
@@ -136,22 +147,30 @@ namespace DAPolyPaint
         private void Indexify()
         {
             var sharedVerts = new List<Vector3>();
+            var vertsDir = new Dictionary<Vector3, int>();
             var indexReplace = new int[_triangles.Length];
             _indexedFaces = new int[_triangles.Length];
             
             for (int i=0; i<NumVerts; i++)
             {
                 var v = _vertices[i];
-                var idx = sharedVerts.FindIndex(x => x == v);
-                
-                if (idx == -1)
+                //var idx = sharedVerts.FindIndex(x => x == v);
+                int idx;
+                if (!vertsDir.TryGetValue(v, out idx))
                 {
-                    indexReplace[i] = sharedVerts.Count;
+                    idx = sharedVerts.Count;
+                    vertsDir.Add(v, idx);
                     sharedVerts.Add(v);
-                } else
-                {
-                    indexReplace[i] = idx;
                 }
+                indexReplace[i] = idx;
+                //if (idx == -1)
+                //{
+                //    indexReplace[i] = sharedVerts.Count;
+                //    sharedVerts.Add(v);
+                //} else
+                //{
+                //    indexReplace[i] = idx;
+                //}
             }
 
             for (int i=0; i<_triangles.Length; i++)
@@ -604,6 +623,7 @@ namespace DAPolyPaint
             if (m != null)
             {
                 m.Clear();
+                if (vertices.Length > 60000) m.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
                 m.SetVertices(new List<Vector3>(vertices)); //  order is important.
                 m.SetUVs(0, new List<Vector2>(UVs));
                 m.SetTriangles(new List<int>(tris), 0);
