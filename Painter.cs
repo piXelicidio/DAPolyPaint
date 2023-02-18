@@ -614,7 +614,7 @@ namespace DAPolyPaint
     }
 
     
-
+    //Stores the link relationship between two adjacent faces.
     public class FaceLink
     {
         public int with;            //linked with which other face?
