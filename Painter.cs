@@ -153,8 +153,7 @@ namespace DAPolyPaint
             
             for (int i=0; i<NumVerts; i++)
             {
-                var v = _vertices[i];
-                //var idx = sharedVerts.FindIndex(x => x == v);
+                var v = _vertices[i];                
                 int idx;
                 if (!vertsDir.TryGetValue(v, out idx))
                 {
@@ -162,15 +161,7 @@ namespace DAPolyPaint
                     vertsDir.Add(v, idx);
                     sharedVerts.Add(v);
                 }
-                indexReplace[i] = idx;
-                //if (idx == -1)
-                //{
-                //    indexReplace[i] = sharedVerts.Count;
-                //    sharedVerts.Add(v);
-                //} else
-                //{
-                //    indexReplace[i] = idx;
-                //}
+                indexReplace[i] = idx;     
             }
 
             for (int i=0; i<_triangles.Length; i++)
