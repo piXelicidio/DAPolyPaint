@@ -18,6 +18,7 @@ namespace DAPolyPaint
         List<Vector2> _UVs;
         Vector3[] _vertices;            //all non optimized vertices of the actual mesh
         Vector3[] _indexedVerts;
+        private List<int>[] _facesUsingVert;
         int[] _triangles;
         int[] _indexedFaces;
         float[] _angles;                //angle of each triangle corners
@@ -122,7 +123,7 @@ namespace DAPolyPaint
 
             Debug.Log("<b>CalcAngles, Elapsed:</b> " + (Environment.TickCount - t).ToString() + "ms");
             t = Environment.TickCount;
-            //BuildFaceGraph();
+            BuildFaceGraph_2();
 
             Undo_Reset();
 
@@ -149,6 +150,7 @@ namespace DAPolyPaint
             var sharedVerts = new List<Vector3>();
             var vertsDir = new Dictionary<Vector3, int>();
             var indexReplace = new int[_triangles.Length];
+            var facesUsingVert = new List<List<int>>();
             _indexedFaces = new int[_triangles.Length];
             
             for (int i=0; i<NumVerts; i++)
@@ -160,8 +162,12 @@ namespace DAPolyPaint
                     idx = sharedVerts.Count;
                     vertsDir.Add(v, idx);
                     sharedVerts.Add(v);
+                    var list = new List<int>();
+                    list.Add(i / 3);
+                    facesUsingVert.Add(list);
                 }
-                indexReplace[i] = idx;     
+                indexReplace[i] = idx;
+                facesUsingVert[idx].Add(i / 3);
             }
 
             for (int i=0; i<_triangles.Length; i++)
@@ -169,6 +175,7 @@ namespace DAPolyPaint
                 _indexedFaces[i] = indexReplace[_triangles[i]];
             }
             _indexedVerts = sharedVerts.ToArray();
+            _facesUsingVert = facesUsingVert.ToArray();
 
             //Tested with casual_Female_G model when from 4k verts to originallly 824 verts, just like 3ds Max version.
             //Debug.Log(String.Format("NumVerts before:{0} after:{1}", NumVerts, sharedVerts.Count));
@@ -216,6 +223,93 @@ namespace DAPolyPaint
             }
         }
 
+        //build link relatioships between faces
+        //assumes Indexify() was called before
+        private void BuildFaceGraph_2()
+        {
+            var sum = 0.0f;
+            _faceLinks = new List<FaceLink>[NumFaces];
+            for (int i = 0; i < NumFaces; i++)
+            {
+                _faceLinks[i] = new List<FaceLink>();
+            }
+
+            var myVerts = new int[3];
+            for (int i = 0; i < NumFaces; i++)
+            {
+                for (int j = 0; j < 3; j++)
+                {
+                    myVerts[j] = _indexedFaces[i * 3 + j];
+                }
+                var nearFaces = GetFacesUsingVerts(myVerts);
+                foreach (int f in nearFaces)
+                {
+                   FindCoincidences_2(i, f);                   
+                }
+            }
+
+            //backlinks
+            for (int i = 0; i < NumFaces; i++)
+            {
+                var links = _faceLinks[i];
+                sum += links.Count;
+                for (int j = 0; j < links.Count; j++)
+                {
+                    var backlink = _faceLinks[links[j].with].Find(x => x.with == i);
+                    backlink.backLinkIdx = j;
+                }
+            }
+            Debug.Log("Average Num Links: " + (sum / NumFaces).ToString());
+        }
+
+        public HashSet<int> GetFacesUsingVerts(int[] verts)
+        {
+            var result = new HashSet<int>();
+            for (int i=0; i<verts.Length; i++)
+            {
+                result.UnionWith(_facesUsingVert[verts[i]]);                
+            }
+            return result;
+        }
+
+        private void FindCoincidences_2(int face1, int face2)
+        {
+            if (face1 == face2) return; 
+            //find coincidences...
+            var count = 0;
+            int[] pos = new int[2];
+            int[] posOther = new int[2];
+            for (int p1 = 0; p1 < 3; p1++)
+            {
+                for (int p2 = 0; p2 < 3; p2++)
+                {
+                    if (_indexedFaces[p1 + face1 * 3] == _indexedFaces[p2 + face2 * 3])
+                    {
+                        pos[count] = p1;
+                        posOther[count] = p2;
+                        count++;
+                        break;
+                    }
+                }
+                if (count == 2) break;
+            }
+
+            //ignoring single shared vertices.
+            if (count == 2)
+            {
+                //there is connection:
+                var link = new FaceLink();
+                link.with = face2;
+                link.p1 = pos[0];                  //shared face points 
+                link.p2 = pos[1];
+                link.edge.v1 = _indexedFaces[face1 * 3 + pos[0]];
+                link.edge.v2 = _indexedFaces[face1 * 3 + pos[1]];
+                link.side = GetTriangleSide(pos[0], pos[1]);
+                link.pOut = 3 - (pos[0] + pos[1]); //point left out                
+                
+                _faceLinks[face1].Add(link);                
+            }
+        }
 
         //build relationships, find links between faces
         //Assumes Indexify() was called first
@@ -229,60 +323,65 @@ namespace DAPolyPaint
                 if (_faceLinks[i] == null) _faceLinks[i] = new List<FaceLink>();
                 for (var j = i+1; j < NumFaces; j++)
                 {
-                    //find coincidences...
-                    var count = 0;
-                    int[] pos = new int[2];
-                    int[] posOther = new int[2];
-                    for (int p1 = 0; p1 < 3; p1++)
-                    {
-                        for (int p2 = 0; p2 < 3; p2++)
-                        {
-                            if (_indexedFaces[p1 + i*3] == _indexedFaces[p2 + j*3])
-                            {
-                                pos[count] = p1 ;
-                                posOther[count] = p2 ;
-                                count++;
-                                break;
-                            }
-                        }
-                        if (count == 2) break;
-                    }
-
-                    //ignoring single shared vertices.
-                    if (count == 2)
-                    {
-                        //there is connection:
-                        var link = new FaceLink();
-                        var linkOther = new FaceLink();
-                        link.with = j;
-                        link.p1 = pos[0];                  //shared face points 
-                        link.p2 = pos[1];
-                        link.edge.v1 = _indexedFaces[i * 3 + pos[0]];
-                        link.edge.v2 = _indexedFaces[i * 3 + pos[1]];
-                        link.side = GetTriangleSide(pos[0], pos[1]);
-                        link.pOut = 3 - (pos[0] + pos[1]); //point left out
-                            
-                        linkOther.with = i;
-                        linkOther.p1 = posOther[0];
-                        linkOther.p2 = posOther[1];
-                        linkOther.edge.v1 = _indexedFaces[j * 3 + posOther[0]];
-                        linkOther.edge.v2 = _indexedFaces[j * 3 + posOther[1]];
-                        linkOther.side = GetTriangleSide(posOther[0], posOther[1]);
-                        linkOther.pOut = 3 - (posOther[0] + posOther[1]);                           
-
-                        if (_faceLinks[j] == null) _faceLinks[j] = new List<FaceLink>();
-                        link.backLinkIdx = _faceLinks[j].Count;
-                        linkOther.backLinkIdx = _faceLinks[i].Count;
-                        _faceLinks[i].Add(link);
-                        _faceLinks[j].Add(linkOther);
-                    }
-                    
-                    
+                    FindCoincidences(i, j);
                 }
                 sum += _faceLinks[i].Count;
             }
             Debug.Log("Average Num Links: " + (sum / NumFaces).ToString());
         }
+
+        //find common vertices between two faces, add a link if found 2.
+        private void FindCoincidences(int face1, int face2)
+        {
+            //find coincidences...
+            var count = 0;
+            int[] pos = new int[2];
+            int[] posOther = new int[2];
+            for (int p1 = 0; p1 < 3; p1++)
+            {
+                for (int p2 = 0; p2 < 3; p2++)
+                {
+                    if (_indexedFaces[p1 + face1 * 3] == _indexedFaces[p2 + face2 * 3])
+                    {
+                        pos[count] = p1;
+                        posOther[count] = p2;
+                        count++;
+                        break;
+                    }
+                }
+                if (count == 2) break;
+            }
+
+            //ignoring single shared vertices.
+            if (count == 2)
+            {
+                //there is connection:
+                var link = new FaceLink();
+                var linkOther = new FaceLink();
+                link.with = face2;
+                link.p1 = pos[0];                  //shared face points 
+                link.p2 = pos[1];
+                link.edge.v1 = _indexedFaces[face1 * 3 + pos[0]];
+                link.edge.v2 = _indexedFaces[face1 * 3 + pos[1]];
+                link.side = GetTriangleSide(pos[0], pos[1]);
+                link.pOut = 3 - (pos[0] + pos[1]); //point left out
+
+                linkOther.with = face1;
+                linkOther.p1 = posOther[0];
+                linkOther.p2 = posOther[1];
+                linkOther.edge.v1 = _indexedFaces[face2 * 3 + posOther[0]];
+                linkOther.edge.v2 = _indexedFaces[face2 * 3 + posOther[1]];
+                linkOther.side = GetTriangleSide(posOther[0], posOther[1]);
+                linkOther.pOut = 3 - (posOther[0] + posOther[1]);
+
+                if (_faceLinks[face2] == null) _faceLinks[face2] = new List<FaceLink>();
+                link.backLinkIdx = _faceLinks[face2].Count;
+                linkOther.backLinkIdx = _faceLinks[face1].Count;
+                _faceLinks[face1].Add(link);
+                _faceLinks[face2].Add(linkOther);
+            }
+        }
+
 
         /// <summary>
         /// Finds the best neighbor face to complete a quad.
