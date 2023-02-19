@@ -7,8 +7,10 @@ using UnityEngine;
 
 namespace DAPolyPaint
 {
-    //Deals only with Mesh and UV painting,
-    //don't know anything about UI or GameObjects, could be used in play mode
+    /// <summary>
+    /// Deals with Mesh and UV painting functions. Can be used in play mode.
+    /// </summary>
+    //Doesn't know anything about UI or GameObjects. 
     //Many field/variable names are selected based on the 3ds Max Poly Paint tool implementation
     //and Maxscript methods/properties naming (e. g. NumVerts, NumFaces).
     public class Painter
@@ -31,7 +33,7 @@ namespace DAPolyPaint
         private Mesh _skinAffected;
         private Vector3[] _verticesSkinned;
         private MeshCopy _oldMesh;
-
+        
         public Mesh Target { get { return _targetMesh; } }
         public int NumUVCalls { get; private set; }
         public int NumFaces { get { return _triangles.Length / 3; } }
@@ -44,7 +46,9 @@ namespace DAPolyPaint
             _undoLevels = new List<List<Vector2>>();
         }
 
-        //Set the mesh to be painted and rebuild the internal data structures.
+        /// <summary>
+        /// Set the mesh to be painted and rebuild the internal data structures.
+        /// </summary>        
         //THIS NEED to be called first before any other painting function. TODO: maybe put in the constructor?
         public void SetMeshAndRebuild(Mesh target, bool skinned, Texture2D texture)
         {
@@ -55,7 +59,7 @@ namespace DAPolyPaint
             RebuildMeshForPainting();            
         }
 
-        //Rebuild the mesh data to get ready for painting.
+        ///<summary>Rebuild the mesh data to get ready for painting.</summary>
         void RebuildMeshForPainting()
         {
             var t = Environment.TickCount;
@@ -123,7 +127,7 @@ namespace DAPolyPaint
 
             Debug.Log("<b>CalcAngles, Elapsed:</b> " + (Environment.TickCount - t).ToString() + "ms");
             t = Environment.TickCount;
-            BuildFaceGraph_2();
+            BuildFaceGraph();
 
             Undo_Reset();
 
@@ -140,7 +144,7 @@ namespace DAPolyPaint
 
 
 
-        //Define a new indexed view of the mesh, optimized like it was on 3ds Max source.
+        ///<summary>Defines a new indexed view of the mesh, optimized like it was on 3ds Max source.</summary>
         //Needed for geting relationships between faces, edges, verts.
         //_indexedVerts store unique vertices
         //_indexedFaces every 3 values are 3 indexes pointing to _indexedVerts values.
@@ -198,18 +202,20 @@ namespace DAPolyPaint
             }
         }
 
-        //Return list of Verts indices, no validations
-        private List<int> GetFaceVerts(int face)
+        ///<summary>Return array of Verts indices, no validations</summary>               
+        private int[] GetFaceVerts(int face)
         {
-            return new List<int>() { 
-                _indexedFaces[face*3], 
-                _indexedFaces[face*3+1], 
-                _indexedFaces[face*3+2] 
+            return new int[] {
+                _indexedFaces[face*3],
+                _indexedFaces[face*3+1],
+                _indexedFaces[face*3+2]
             };
-        }   
-        
-        //given unsoreted position p1 p2 (0..2) in a triangle.
-        //return which side of the triangle it represents.
+        }
+
+        ///<summary> 
+        ///Ggiven unsoreted position p1 p2 (0..2) in a triangle. 
+        ///Return which side number of the triangle it represents.
+        ///</summary>                
         private int GetTriangleSide(int p1, int p2)
         {
             var low = Math.Min(p1, p2);
@@ -223,10 +229,46 @@ namespace DAPolyPaint
             }
         }
 
-        //build link relatioships between faces
+        /// <summary> build link relatioships between faces </summary>
         //assumes Indexify() was called before
-        private void BuildFaceGraph_2()
+        private void BuildFaceGraph()
         {
+            void FindCoincidences(int face1, int face2)
+            {
+                if (face1 == face2) return;                
+                var count = 0;
+                int[] pos = new int[2];
+                int[] posOther = new int[2];
+                for (int p1 = 0; p1 < 3; p1++)
+                {
+                    for (int p2 = 0; p2 < 3; p2++)
+                    {
+                        if (_indexedFaces[p1 + face1 * 3] == _indexedFaces[p2 + face2 * 3])
+                        {
+                            pos[count] = p1;
+                            posOther[count] = p2;
+                            count++;
+                            break;
+                        }
+                    }
+                }
+                //ignoring single shared vertices.
+                if (count == 2)
+                {
+                    //there is connection:
+                    var link = new FaceLink();
+                    link.with = face2;
+                    link.p1 = pos[0];                  //shared face points 
+                    link.p2 = pos[1];
+                    link.edge.v1 = _indexedFaces[face1 * 3 + pos[0]];
+                    link.edge.v2 = _indexedFaces[face1 * 3 + pos[1]];
+                    link.side = GetTriangleSide(pos[0], pos[1]);
+                    link.pOut = 3 - (pos[0] + pos[1]); //point left out                
+
+                    _faceLinks[face1].Add(link);
+                }
+            }
+
             var sum = 0.0f;
             _faceLinks = new List<FaceLink>[NumFaces];
             for (int i = 0; i < NumFaces; i++)
@@ -236,15 +278,11 @@ namespace DAPolyPaint
 
             var myVerts = new int[3];
             for (int i = 0; i < NumFaces; i++)
-            {
-                for (int j = 0; j < 3; j++)
-                {
-                    myVerts[j] = _indexedFaces[i * 3 + j];
-                }
-                var nearFaces = GetFacesUsingVerts(myVerts);
+            {                
+                var nearFaces = GetFacesUsingVerts(GetFaceVerts(i));
                 foreach (int f in nearFaces)
                 {
-                   FindCoincidences_2(i, f);                   
+                   FindCoincidences(i, f);                   
                 }
             }
 
@@ -272,117 +310,9 @@ namespace DAPolyPaint
             return result;
         }
 
-        private void FindCoincidences_2(int face1, int face2)
-        {
-            if (face1 == face2) return; 
-            //find coincidences...
-            var count = 0;
-            int[] pos = new int[2];
-            int[] posOther = new int[2];
-            for (int p1 = 0; p1 < 3; p1++)
-            {
-                for (int p2 = 0; p2 < 3; p2++)
-                {
-                    if (_indexedFaces[p1 + face1 * 3] == _indexedFaces[p2 + face2 * 3])
-                    {
-                        pos[count] = p1;
-                        posOther[count] = p2;
-                        count++;
-                        break;
-                    }
-                }
-                if (count == 2) break;
-            }
-
-            //ignoring single shared vertices.
-            if (count == 2)
-            {
-                //there is connection:
-                var link = new FaceLink();
-                link.with = face2;
-                link.p1 = pos[0];                  //shared face points 
-                link.p2 = pos[1];
-                link.edge.v1 = _indexedFaces[face1 * 3 + pos[0]];
-                link.edge.v2 = _indexedFaces[face1 * 3 + pos[1]];
-                link.side = GetTriangleSide(pos[0], pos[1]);
-                link.pOut = 3 - (pos[0] + pos[1]); //point left out                
-                
-                _faceLinks[face1].Add(link);                
-            }
-        }
-
-        //build relationships, find links between faces
-        //Assumes Indexify() was called first
-        private void BuildFaceGraph()
-        {
-            //NOTE: 3 common verts is an annomally
-            var sum = 0.0f;
-            _faceLinks = new List<FaceLink>[NumFaces];
-            for (var i = 0; i < NumFaces-1; i++)
-            {
-                if (_faceLinks[i] == null) _faceLinks[i] = new List<FaceLink>();
-                for (var j = i+1; j < NumFaces; j++)
-                {
-                    FindCoincidences(i, j);
-                }
-                sum += _faceLinks[i].Count;
-            }
-            Debug.Log("Average Num Links: " + (sum / NumFaces).ToString());
-        }
-
-        //find common vertices between two faces, add a link if found 2.
-        private void FindCoincidences(int face1, int face2)
-        {
-            //find coincidences...
-            var count = 0;
-            int[] pos = new int[2];
-            int[] posOther = new int[2];
-            for (int p1 = 0; p1 < 3; p1++)
-            {
-                for (int p2 = 0; p2 < 3; p2++)
-                {
-                    if (_indexedFaces[p1 + face1 * 3] == _indexedFaces[p2 + face2 * 3])
-                    {
-                        pos[count] = p1;
-                        posOther[count] = p2;
-                        count++;
-                        break;
-                    }
-                }
-                if (count == 2) break;
-            }
-
-            //ignoring single shared vertices.
-            if (count == 2)
-            {
-                //there is connection:
-                var link = new FaceLink();
-                var linkOther = new FaceLink();
-                link.with = face2;
-                link.p1 = pos[0];                  //shared face points 
-                link.p2 = pos[1];
-                link.edge.v1 = _indexedFaces[face1 * 3 + pos[0]];
-                link.edge.v2 = _indexedFaces[face1 * 3 + pos[1]];
-                link.side = GetTriangleSide(pos[0], pos[1]);
-                link.pOut = 3 - (pos[0] + pos[1]); //point left out
-
-                linkOther.with = face1;
-                linkOther.p1 = posOther[0];
-                linkOther.p2 = posOther[1];
-                linkOther.edge.v1 = _indexedFaces[face2 * 3 + posOther[0]];
-                linkOther.edge.v2 = _indexedFaces[face2 * 3 + posOther[1]];
-                linkOther.side = GetTriangleSide(posOther[0], posOther[1]);
-                linkOther.pOut = 3 - (posOther[0] + posOther[1]);
-
-                if (_faceLinks[face2] == null) _faceLinks[face2] = new List<FaceLink>();
-                link.backLinkIdx = _faceLinks[face2].Count;
-                linkOther.backLinkIdx = _faceLinks[face1].Count;
-                _faceLinks[face1].Add(link);
-                _faceLinks[face2].Add(linkOther);
-            }
-        }
 
 
+        
         /// <summary>
         /// Finds the best neighbor face to complete a quad.
         /// </summary>
@@ -505,7 +435,7 @@ namespace DAPolyPaint
             return _faceLinks[face]; 
         }
 
-        //TODO: looks that something that should go in the "create" method
+        //TODO: looks that something that should go in the constructor
         public void SetSkinAffected(Mesh snapshot)
         {
             _skinAffected = snapshot;
@@ -564,7 +494,9 @@ namespace DAPolyPaint
                 return _textureData.GetPixel((int)(uv.x * _textureData.width), (int)(uv.y * _textureData.height));
         }
 
-        //if a link to the other face is not found return null
+        /// <summary>
+        /// if a link to the other face is not found return null
+        /// </summary>
         public FaceLink FindLink(int fromFace, int toFace)
         {
             if (fromFace!=-1  && toFace!=1)
@@ -580,7 +512,9 @@ namespace DAPolyPaint
             return null;
         }
                 
-        //Given two adjacent faces (f1 and f2), find a loop.
+        /// <summary>
+        /// Given two adjacent faces (f1 and f2), find a loop.
+        /// </summary>
         public HashSet<int> FindLoop(int f1, int f2)
         {            
             if (f1 == -1 || f2 == -1) return new HashSet<int>();
@@ -724,7 +658,9 @@ namespace DAPolyPaint
     }
 
     
-    //Stores the link relationship between two adjacent faces.
+    /// <summary>
+    /// Stores the link relationship between two adjacent faces.
+    /// </summary>
     public class FaceLink
     {
         public int with;            //linked with which other face?
