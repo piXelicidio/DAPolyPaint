@@ -6,6 +6,7 @@ using EGL = UnityEditor.EditorGUILayout;
 using System;
 using System.IO;
 using System.Text;
+using static UnityEngine.GridBrushBase;
 
 namespace DAPolyPaint
 {
@@ -525,118 +526,119 @@ namespace DAPolyPaint
                 EditorGUIDrawFrame("PAINT MODE");
                 Handles.EndGUI();
 
-
                 OnSceneShiftState(ev);
 
-                var tool = GetCurrToolName();
+                ProcessSceneEvents(scene, id, ev);
+            }
+        }
 
+        void ProcessSceneEvents(SceneView scene, int id, Event ev)
+        {
+            var tool = GetCurrToolName();
+            if (ev.type == EventType.MouseDrag)
+            {
+                var prevFace = _lastFace;
+                _lastFace = GetFaceHit(scene, ev.mousePosition);
 
-
-                if (ev.type == EventType.MouseDrag)
+                if (_lastFace != prevFace)
                 {
-                    var prevFace = _lastFace;
-                    _lastFace = GetFaceHit(scene, ev.mousePosition);
-
-                    if (_lastFace != prevFace)
-                    {
-                        BuildCursor();
-                        if (_isPressed)
-                        {
-                            if (tool == "Loop")
-                            {
-                                Debug.Log(String.Format("Ctrl+drag: From {0} to {1}", prevFace, _lastFace));
-                                BuildLoopCursor(prevFace, _lastFace);
-                                scene.Repaint();
-                                //PaintUsingCursor();
-                            }
-                            else if (tool == "Pick")
-                            {
-                                PickFromSurface(_lastFace);
-                            }
-                            else if (tool == "Brush") PaintUsingCursor();
-                        }
-                    }
-                    this.Repaint();
-                }
-                else if (ev.type == EventType.MouseMove)
-                {
-                    var prevFace = _lastFace;
-                    _lastFace = GetFaceHit(scene, ev.mousePosition);
-                    if (_lastFace != prevFace)
-                    {
-                        BuildCursor();
-                        //SceneView.RepaintAll();
-                        scene.Repaint();
-                        //Repaint();
-                    }
-                }
-                else if (ev.type == EventType.MouseDown)
-                {
-                    if (ev.button == 0)
-                    {
-                        AcquireInput(ev, id);
-                        _isPressed = true;
-                        if (_targetMesh != null)
-                        {
-                            _lastFace = GetFaceHit(scene, ev.mousePosition);
-                            BuildCursor();
-                            if (tool == "Fill")
-                            {
-                                if (_lastFace != -1)
-                                {
-                                    _painter.FillPaint(_lastFace, _lastUVpick);
-                                    _painter.Undo_SaveState();
-                                }
-                            }
-                            else if (tool == "Pick")
-                            {
-                                PickFromSurface(_lastFace);
-                            }
-                            else if (tool == "Loop") { }
-                            else PaintUsingCursor();
-                            Repaint();
-                        }
-                    }
-                }
-                else if (ev.type == EventType.MouseUp)
-                {
-                    if (ev.button == 0)
+                    BuildCursor();
+                    if (_isPressed)
                     {
                         if (tool == "Loop")
                         {
-                            PaintUsingCursor();
-                            _painter.Undo_SaveState();
+                            Debug.Log(String.Format("Ctrl+drag: From {0} to {1}", prevFace, _lastFace));
+                            BuildLoopCursor(prevFace, _lastFace);
+                            scene.Repaint();
+                            //PaintUsingCursor();
                         }
-                        else if (tool == "Brush")
+                        else if (tool == "Pick")
                         {
-                            _painter.Undo_SaveState();
+                            PickFromSurface(_lastFace);
                         }
-                        ReleaseInput(ev);
-                        _isPressed = false;
+                        else if (tool == "Brush") PaintUsingCursor();
                     }
                 }
-                else if (ev.type == EventType.KeyDown)
+                this.Repaint();
+            }
+            else if (ev.type == EventType.MouseMove)
+            {
+                var prevFace = _lastFace;
+                _lastFace = GetFaceHit(scene, ev.mousePosition);
+                if (_lastFace != prevFace)
                 {
-                    if (ev.control)
+                    BuildCursor();
+                    //SceneView.RepaintAll();
+                    scene.Repaint();
+                    //Repaint();
+                }
+            }
+            else if (ev.type == EventType.MouseDown)
+            {
+                if (ev.button == 0)
+                {
+                    AcquireInput(ev, id);
+                    _isPressed = true;
+                    if (_targetMesh != null)
                     {
-                        if (ev.keyCode == KeyCode.Z)
+                        _lastFace = GetFaceHit(scene, ev.mousePosition);
+                        BuildCursor();
+                        if (tool == "Fill")
                         {
-                            //catching Ctrl+Z
-                            Debug.Log("Ctrl+Z: Undo");
-                            _painter.Undo_Undo();
-                        } else if (ev.keyCode == KeyCode.Y)
-                        {
-                            Debug.Log("Ctrl+Y: Redo");
-                            _painter.Undo_Redo();
+                            if (_lastFace != -1)
+                            {
+                                _painter.FillPaint(_lastFace, _lastUVpick);
+                                _painter.Undo_SaveState();
+                            }
                         }
+                        else if (tool == "Pick")
+                        {
+                            PickFromSurface(_lastFace);
+                        }
+                        else if (tool == "Loop") { }
+                        else PaintUsingCursor();
+                        Repaint();
                     }
-                    if (!isAllowedInput(ev)) { ev.Use(); }
                 }
-                else if (ev.type == EventType.KeyUp)
+            }
+            else if (ev.type == EventType.MouseUp)
+            {
+                if (ev.button == 0)
                 {
-                    if (!isAllowedInput(ev)) { ev.Use(); }
+                    if (tool == "Loop")
+                    {
+                        PaintUsingCursor();
+                        _painter.Undo_SaveState();
+                    }
+                    else if (tool == "Brush")
+                    {
+                        _painter.Undo_SaveState();
+                    }
+                    ReleaseInput(ev);
+                    _isPressed = false;
                 }
-
+            }
+            else if (ev.type == EventType.KeyDown)
+            {
+                if (ev.control)
+                {
+                    if (ev.keyCode == KeyCode.Z)
+                    {
+                        //catching Ctrl+Z
+                        Debug.Log("Ctrl+Z: Undo");
+                        _painter.Undo_Undo();
+                    }
+                    else if (ev.keyCode == KeyCode.Y)
+                    {
+                        Debug.Log("Ctrl+Y: Redo");
+                        _painter.Undo_Redo();
+                    }
+                }
+                if (!isAllowedInput(ev)) { ev.Use(); }
+            }
+            else if (ev.type == EventType.KeyUp)
+            {
+                if (!isAllowedInput(ev)) { ev.Use(); }
             }
         }
 
@@ -911,6 +913,14 @@ namespace DAPolyPaint
 
     public class PolyList : List<PolyFace> { }
 
+    public struct CursorRay
+    {
+        public Vector3 direction;
+        public Vector3 origin;
+        public float size;
+        public bool enabled;
+    }
+
     /// <summary>
     /// With this class we can draw the cursor in the scene view using Gizmos.DrawLine.
     /// </summary>
@@ -922,6 +932,7 @@ namespace DAPolyPaint
 
         public static bool PaintMode { get; set; }
         public static PolyList PolyCursor { get { return _polyCursor; }}
+        public static CursorRay[] CursorRays = new CursorRay[2];
 
         public static void SetPixelColor(Color c)
         {
