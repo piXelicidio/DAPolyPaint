@@ -34,7 +34,7 @@ namespace DAPolyPaint
         private Color _lastPixelColor;
         private Vector2 _scrollPos;
         private MeshCollider _meshCollider;
-        private bool _autoQuads;
+        private bool _autoQuads = true;
         private string[] _toolNames = new string[] { "Brush", "Fill", "Loop", "Pick" };
         private int _currTool = 0;
         private bool _anyModifiers = false;
@@ -143,8 +143,8 @@ namespace DAPolyPaint
                 GUILayout.Label("Current tool: (Tip: use Ctrl and/or Shift)");
                 _currTool = GUILayout.Toolbar(_currTool, _toolNames);
                 _autoQuads = EGL.ToggleLeft("Auto-detect quads", _autoQuads);
-                EGL.PrefixLabel("Max quad tolerance:");
-                if (_painter!=null)  _painter.QuadTolerance = EGL.Slider(_painter.QuadTolerance, 0.1f, 360f);
+                //EGL.PrefixLabel("Max quad tolerance:");
+                //if (_painter!=null)  _painter.QuadTolerance = EGL.Slider(_painter.QuadTolerance, 0.1f, 360f);
 
                 OnGUI_SavePaintedMesh();
             }
