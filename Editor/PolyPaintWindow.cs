@@ -467,12 +467,32 @@ namespace DAPolyPaint
                     {
                         result = _lastHit.triangleIndex;
                     }
+                    UpdateCursorRays(result, _lastHit);
                 } else
                 {
                     Debug.LogWarning("No collider to do raycast.");
                 }
             }
             return result;
+        }
+
+        void UpdateCursorRays(int faceResult, RaycastHit hitInfo)
+        {
+            if (faceResult>0 )
+            {
+                PaintEditor.CursorRays[0].enabled = true;
+                PaintEditor.CursorRays[0].direction = hitInfo.normal;
+                PaintEditor.CursorRays[0].origin = hitInfo.point;    
+                if (_mirrorCursor)
+                {
+                    //TODO: mirror the hit to get the mirrorer ray
+                }
+
+            } else
+            {
+                PaintEditor.CursorRays[0].enabled = false;
+                PaintEditor.CursorRays[1].enabled = false;
+            }
         }
 
         void EditorGUIDrawFrame(string label, int border = 2)
@@ -535,6 +555,7 @@ namespace DAPolyPaint
         void ProcessSceneEvents(SceneView scene, int id, Event ev)
         {
             var tool = GetCurrToolName();
+            
             if (ev.type == EventType.MouseDrag)
             {
                 var prevFace = _lastFace;
@@ -549,7 +570,7 @@ namespace DAPolyPaint
                         {
                             Debug.Log(String.Format("Ctrl+drag: From {0} to {1}", prevFace, _lastFace));
                             BuildLoopCursor(prevFace, _lastFace);
-                            scene.Repaint();
+                            //scene.Repaint();
                             //PaintUsingCursor();
                         }
                         else if (tool == "Pick")
@@ -559,8 +580,10 @@ namespace DAPolyPaint
                         else if (tool == "Brush") PaintUsingCursor();
                     }
                 }
+                scene.Repaint();
                 this.Repaint();
             }
+
             else if (ev.type == EventType.MouseMove)
             {
                 var prevFace = _lastFace;
@@ -569,10 +592,12 @@ namespace DAPolyPaint
                 {
                     BuildCursor();
                     //SceneView.RepaintAll();
-                    scene.Repaint();
+                    //scene.Repaint();
                     //Repaint();
                 }
+                scene.Repaint();
             }
+
             else if (ev.type == EventType.MouseDown)
             {
                 if (ev.button == 0)
@@ -601,6 +626,7 @@ namespace DAPolyPaint
                     }
                 }
             }
+
             else if (ev.type == EventType.MouseUp)
             {
                 if (ev.button == 0)
@@ -618,6 +644,7 @@ namespace DAPolyPaint
                     _isPressed = false;
                 }
             }
+
             else if (ev.type == EventType.KeyDown)
             {
                 if (ev.control)
@@ -636,6 +663,7 @@ namespace DAPolyPaint
                 }
                 if (!isAllowedInput(ev)) { ev.Use(); }
             }
+
             else if (ev.type == EventType.KeyUp)
             {
                 if (!isAllowedInput(ev)) { ev.Use(); }
@@ -917,7 +945,6 @@ namespace DAPolyPaint
     {
         public Vector3 direction;
         public Vector3 origin;
-        public float size;
         public bool enabled;
     }
 
@@ -945,6 +972,7 @@ namespace DAPolyPaint
         {
             if (PaintMode)
             {
+                //Drawing cursor triangles
                 if ( _polyCursor.Count > 0)
                 {
                     for (int p = 0; p < _polyCursor.Count; p++)
@@ -961,6 +989,17 @@ namespace DAPolyPaint
                                 average += poly[i];
                             }
                         }
+                    }
+                }
+
+                //Drawing cursor rays
+                foreach (CursorRay ray in CursorRays)
+                {
+                    if (ray.enabled)
+                    {
+                        var v2 = ray.origin + ray.direction * 0.1f;
+                        Gizmos.color = Color.white;
+                        Gizmos.DrawLine(ray.origin, v2);        
                     }
                 }
             }
