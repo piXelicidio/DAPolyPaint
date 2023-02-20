@@ -38,6 +38,13 @@ namespace DAPolyPaint
         private MeshCollider _meshCollider;
         private bool _autoQuads = true;
         private string[] _toolNames = new string[] { "Brush", "Fill", "Loop", "Pick" };
+        private GUIContent[] _toolNames_gc = new GUIContent[] 
+            {
+                new GUIContent("Bursh", "Paint Faces"),  
+                new GUIContent("Fill", "(Ctrl) Fill Continuous faces of same color"),
+                new GUIContent("Loop", "(Ctrl+Shift) Detect and paint face loops"),
+                new GUIContent("Pick", "(Shift) Pick the color from a face")
+            };
         private int _currTool = 0;
         private bool _anyModifiers = false;
         private int _savedTool;
@@ -142,8 +149,7 @@ namespace DAPolyPaint
                     if (GUILayout.Button("Full Repaint")) _painter.FullRepaint(_lastUVpick);
                 }
                 EGL.Space();
-                GUILayout.Label("Current tool: (Tip: use Ctrl and/or Shift)");
-                _currTool = GUILayout.Toolbar(_currTool, _toolNames);
+                _currTool = GUILayout.Toolbar(_currTool, _toolNames_gc);
                 _autoQuads = EGL.ToggleLeft("Auto-detect quads", _autoQuads);
                 //EGL.PrefixLabel("Max quad tolerance:");
                 //if (_painter!=null)  _painter.QuadTolerance = EGL.Slider(_painter.QuadTolerance, 0.1f, 360f);
