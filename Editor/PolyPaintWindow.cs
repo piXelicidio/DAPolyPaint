@@ -39,7 +39,7 @@ namespace DAPolyPaint
         private int _currTool = 0;
         private bool _anyModifiers = false;
         private int _savedTool;
-        private bool _autoSave = true;
+        private bool _autoSave = false;
         const float _statusColorBarHeight = 3;
         private const string DummyName = "$pp_dummy$";
         public readonly Color ColorStatusReady = Color.green;
