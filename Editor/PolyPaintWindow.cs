@@ -37,6 +37,7 @@ namespace DAPolyPaint
         private Vector2 _scrollPos;
         private MeshCollider _meshCollider;
         private bool _autoQuads = true;
+        private bool _mirrorCursor = false;
         private string[] _toolNames = new string[] { "Brush", "Fill", "Loop", "Pick" };
         private GUIContent[] _toolNames_gc = new GUIContent[] 
             {
@@ -153,7 +154,7 @@ namespace DAPolyPaint
                 _autoQuads = EGL.ToggleLeft("Auto-detect quads", _autoQuads);
                 //EGL.PrefixLabel("Max quad tolerance:");
                 //if (_painter!=null)  _painter.QuadTolerance = EGL.Slider(_painter.QuadTolerance, 0.1f, 360f);
-
+                _mirrorCursor = EGL.ToggleLeft(new GUIContent("Mirror Cursor", ""), _mirrorCursor);
                 OnGUI_SavePaintedMesh();
             }
 
@@ -910,7 +911,9 @@ namespace DAPolyPaint
 
     public class PolyList : List<PolyFace> { }
 
-    //With this class we can draw the cursor in the scene view using Gizmos.DrawLine.
+    /// <summary>
+    /// With this class we can draw the cursor in the scene view using Gizmos.DrawLine.
+    /// </summary>
     [CustomEditor(typeof(PaintCursor))]
     public class PaintEditor : Editor
     {
@@ -929,21 +932,24 @@ namespace DAPolyPaint
         [DrawGizmo(GizmoType.Selected | GizmoType.NonSelected)]
         static void DrawGizmos(PaintCursor obj, GizmoType gizmoType) //need to be static
         {
-            if (PaintMode && _polyCursor.Count > 0)
+            if (PaintMode)
             {
-                for (int p=0; p<_polyCursor.Count; p++)
+                if ( _polyCursor.Count > 0)
                 {
-                    var poly = _polyCursor[p]; 
-                    if (poly.Count > 2)
+                    for (int p = 0; p < _polyCursor.Count; p++)
                     {
-                        var average = Vector3.zero;
-
-                        for (var i = 0; i < poly.Count; i++)
+                        var poly = _polyCursor[p];
+                        if (poly.Count > 2)
                         {
-                            Gizmos.color = _currPixelColor;
-                            Gizmos.DrawLine(poly[i], poly[(i + 1) % poly.Count]);
-                            average += poly[i];
-                        }                        
+                            var average = Vector3.zero;
+
+                            for (var i = 0; i < poly.Count; i++)
+                            {
+                                Gizmos.color = _currPixelColor;
+                                Gizmos.DrawLine(poly[i], poly[(i + 1) % poly.Count]);
+                                average += poly[i];
+                            }
+                        }
                     }
                 }
             }
