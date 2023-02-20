@@ -9,7 +9,9 @@ using System.Text;
 
 namespace DAPolyPaint
 {
-
+    /// <summary>
+    /// GUI Editor Window for PolyPaint
+    /// </summary>
     public class PolyPaintWindow : EditorWindow
     {
         Painter _painter;
