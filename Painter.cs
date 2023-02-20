@@ -114,25 +114,24 @@ namespace DAPolyPaint
                 m.boneWeights = newBW;                
             }
 
-
-            Debug.Log("<b>Rebuild, Elapsed:</b> " + (Environment.TickCount - t).ToString() + "ms");
+            string s;
+            s = "<b>Rebuild, Elapsed:</b> " + (Environment.TickCount - t).ToString() + "ms - ";
             t = Environment.TickCount;
 
             Indexify();
-
-            Debug.Log("<b>Indexify, Elapsed:</b> " + (Environment.TickCount - t).ToString() + "ms");
+            s += "<b>Indexify, Elapsed:</b> " + (Environment.TickCount - t).ToString() + "ms - ";
             t = Environment.TickCount;
 
             CalcAngles();
-
-            Debug.Log("<b>CalcAngles, Elapsed:</b> " + (Environment.TickCount - t).ToString() + "ms");
+            s += "<b>CalcAngles, Elapsed:</b> " + (Environment.TickCount - t).ToString() + "ms - ";
             t = Environment.TickCount;
+
             BuildFaceGraph();
-
             Undo_Reset();
+            s += "<b>BuildFaceGraph, Elapsed:</b> " + (Environment.TickCount - t).ToString() + "ms";
+            Debug.Log(s);
 
-            Debug.Log("<b>BuildFaceGraph, Elapsed:</b> " + (Environment.TickCount - t).ToString() + "ms");
-
+            
         }
 
         //After calling RestoreOldMesh, all other painting functions will fail, unless you call RebuildMeshForPainting again.
@@ -156,6 +155,7 @@ namespace DAPolyPaint
             var indexReplace = new int[_triangles.Length];
             var facesUsingVert = new List<List<int>>();
             _indexedFaces = new int[_triangles.Length];
+            var dumbSymmetryTest = 0;
             
             for (int i=0; i<NumVerts; i++)
             {
@@ -169,6 +169,7 @@ namespace DAPolyPaint
                     var list = new List<int>();
                     list.Add(i / 3);
                     facesUsingVert.Add(list);
+                    if (v.x > 0) dumbSymmetryTest++; else if (v.x < 0) dumbSymmetryTest--;
                 }
                 indexReplace[i] = idx;
                 facesUsingVert[idx].Add(i / 3);
@@ -182,7 +183,7 @@ namespace DAPolyPaint
             _facesUsingVert = facesUsingVert.ToArray();
 
             //Tested with casual_Female_G model when from 4k verts to originallly 824 verts, just like 3ds Max version.
-            //Debug.Log(String.Format("NumVerts before:{0} after:{1}", NumVerts, sharedVerts.Count));
+            Debug.Log(String.Format("NumVerts before:{0} after:{1} dumbSymmetryTest:{2}", NumVerts, sharedVerts.Count, dumbSymmetryTest));
         }
 
         private void CalcAngles()
