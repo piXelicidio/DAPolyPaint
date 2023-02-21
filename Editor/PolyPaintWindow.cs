@@ -31,7 +31,8 @@ namespace DAPolyPaint
         Vector3 _currMousePosCam;
 
         RaycastHit _lastHit;
-        int _lastFace;
+        int _lastFace; //last face hit by raycast
+        int _prevFace; //previous face hit by raycast;
         private PaintCursor _paintCursor;
         Vector2 _lastUVpick;
         private Color _lastPixelColor;
@@ -51,6 +52,7 @@ namespace DAPolyPaint
         private bool _anyModifiers = false;
         private int _savedTool;
         private bool _autoSave = false;
+        private bool _CursorOverObject;
         const float _statusColorBarHeight = 3;
         private const string DummyName = "$pp_dummy$";
         public readonly Color ColorStatusReady = Color.green;
@@ -449,7 +451,23 @@ namespace DAPolyPaint
             EditorGUIUtility.SetWantsMouseJumping(0);
         }
 
-        int GetFaceHit(SceneView sv, Vector2 currMousePos)
+        /// <summary>
+        /// Does a raycast and updates _prevFace and _lastFace
+        /// </summary>
+        private void DoFaceHit(SceneView sv, Vector2 currMousePos)
+        {
+            _prevFace = _lastFace;
+            _lastFace = GetFaceHit(sv, currMousePos);
+            if (_prevFace == -1 && _lastFace >= 0)
+            {
+                OnCursorEnterObject(sv.position);
+            } else if (_prevFace >=0 && _lastFace == -1) 
+            {
+                OnCursorExitObject(sv.position);
+            }
+        }
+        
+        int GetFaceHit(SceneView sv, Vector2 currMousePos, bool needCursorRays = true)
         {
             int result = -1;
             if (_targetMesh != null)
@@ -467,7 +485,7 @@ namespace DAPolyPaint
                     {
                         result = _lastHit.triangleIndex;
                     }
-                    UpdateCursorRays(result, _lastHit);
+                    if (needCursorRays) UpdateCursorRays(result, _lastHit, ray);
                 } else
                 {
                     Debug.LogWarning("No collider to do raycast.");
@@ -476,7 +494,7 @@ namespace DAPolyPaint
             return result;
         }
 
-        void UpdateCursorRays(int faceResult, RaycastHit hitInfo)
+        void UpdateCursorRays(int faceResult, RaycastHit hitInfo, Ray cameraRay)
         {
             if (faceResult>0 )
             {
@@ -486,6 +504,11 @@ namespace DAPolyPaint
                 if (_mirrorCursor)
                 {
                     //TODO: mirror the hit to get the mirrorer ray
+                    var plane = -_targetObject.transform.right;
+                    var origin = _targetObject.transform.position;
+                    PaintEditor.CursorRays[1].enabled = true;
+                    PaintEditor.CursorRays[1].direction = Vector3.Reflect(hitInfo.normal, plane);
+                    PaintEditor.CursorRays[1].origin = Vector3.Reflect(hitInfo.point-origin, plane) + origin;
                 }
 
             } else
@@ -552,81 +575,46 @@ namespace DAPolyPaint
             }
         }
 
-        void ProcessSceneEvents(SceneView scene, int id, Event ev)
+        private void OnCursorEnterObject(Rect position)
+        {
+            _CursorOverObject = true;
+            Debug.Log("Entering 3D object...");
+        }
+
+        private void OnCursorExitObject(Rect position)
+        {
+            _CursorOverObject = false;
+            Debug.Log("Exiting 3D object...");
+        }
+
+        private void ProcessSceneEvents(SceneView scene, int id, Event ev)
         {
             var tool = GetCurrToolName();
             
+            //When the mouse is moving while the left click is pressed
             if (ev.type == EventType.MouseDrag)
             {
-                var prevFace = _lastFace;
-                _lastFace = GetFaceHit(scene, ev.mousePosition);
-
-                if (_lastFace != prevFace)
-                {
-                    BuildCursor();
-                    if (_isPressed)
-                    {
-                        if (tool == "Loop")
-                        {
-                            Debug.Log(String.Format("Ctrl+drag: From {0} to {1}", prevFace, _lastFace));
-                            BuildLoopCursor(prevFace, _lastFace);
-                            //scene.Repaint();
-                            //PaintUsingCursor();
-                        }
-                        else if (tool == "Pick")
-                        {
-                            PickFromSurface(_lastFace);
-                        }
-                        else if (tool == "Brush") PaintUsingCursor();
-                    }
-                }
-                scene.Repaint();
-                this.Repaint();
+                DoMouseDrag(scene, ev, tool);
             }
-
+            //When the mouse is moving freely around
             else if (ev.type == EventType.MouseMove)
             {
-                var prevFace = _lastFace;
-                _lastFace = GetFaceHit(scene, ev.mousePosition);
-                if (_lastFace != prevFace)
+                DoFaceHit(scene, ev.mousePosition);
+                if (_lastFace != _prevFace)
                 {
                     BuildCursor();
-                    //SceneView.RepaintAll();
-                    //scene.Repaint();
-                    //Repaint();
                 }
                 scene.Repaint();
             }
-
+            //When the mouse click is pressed down
             else if (ev.type == EventType.MouseDown)
             {
                 if (ev.button == 0)
                 {
-                    AcquireInput(ev, id);
-                    _isPressed = true;
-                    if (_targetMesh != null)
-                    {
-                        _lastFace = GetFaceHit(scene, ev.mousePosition);
-                        BuildCursor();
-                        if (tool == "Fill")
-                        {
-                            if (_lastFace != -1)
-                            {
-                                _painter.FillPaint(_lastFace, _lastUVpick);
-                                _painter.Undo_SaveState();
-                            }
-                        }
-                        else if (tool == "Pick")
-                        {
-                            PickFromSurface(_lastFace);
-                        }
-                        else if (tool == "Loop") { }
-                        else PaintUsingCursor();
-                        Repaint();
-                    }
+                    DoMouseDownLeftClick(scene, id, ev, tool);
                 }
             }
-
+            //When the mouse click is released
             else if (ev.type == EventType.MouseUp)
             {
                 if (ev.button == 0)
@@ -644,7 +632,7 @@ namespace DAPolyPaint
                     _isPressed = false;
                 }
             }
-
+            //when a key is pressed down
             else if (ev.type == EventType.KeyDown)
             {
                 if (ev.control)
@@ -663,11 +651,63 @@ namespace DAPolyPaint
                 }
                 if (!isAllowedInput(ev)) { ev.Use(); }
             }
-
+            //when a key is released
             else if (ev.type == EventType.KeyUp)
             {
                 if (!isAllowedInput(ev)) { ev.Use(); }
             }
+        }
+
+        private void DoMouseDownLeftClick(SceneView scene, int id, Event ev, string tool)
+        {
+            AcquireInput(ev, id);
+            _isPressed = true;
+            if (_targetMesh != null)
+            {
+                DoFaceHit(scene, ev.mousePosition);
+                BuildCursor();
+                if (tool == "Fill")
+                {
+                    if (_lastFace != -1)
+                    {
+                        _painter.FillPaint(_lastFace, _lastUVpick);
+                        _painter.Undo_SaveState();
+                    }
+                }
+                else if (tool == "Pick")
+                {
+                    PickFromSurface(_lastFace);
+                }
+                else if (tool == "Loop") { }
+                else PaintUsingCursor();
+                Repaint();
+            }
+        }
+
+        private void DoMouseDrag(SceneView scene, Event ev, string tool)
+        {
+            DoFaceHit(scene, ev.mousePosition);
+            if (_lastFace != _prevFace)
+            {
+                BuildCursor();
+                if (_isPressed)
+                {
+                    if (tool == "Loop")
+                    {
+                        Debug.Log(String.Format("Ctrl+drag: From {0} to {1}", _prevFace, _lastFace));
+                        BuildLoopCursor(_prevFace, _lastFace);
+                        //scene.Repaint();
+                        //PaintUsingCursor();
+                    }
+                    else if (tool == "Pick")
+                    {
+                        PickFromSurface(_lastFace);
+                    }
+                    else if (tool == "Brush") PaintUsingCursor();
+                }
+            }
+            scene.Repaint();
+            this.Repaint();
         }
 
         private bool isAllowedInput(Event ev)
@@ -1006,9 +1046,9 @@ namespace DAPolyPaint
             
 	    }
 
-        void OnSceneGUI()
-        {
-            //can draw GUI or interactive handles
-        }
+        //void OnSceneGUI()
+        //{
+        //    //can draw GUI or interactive handles
+        //}
     }
 }
