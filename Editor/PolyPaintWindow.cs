@@ -7,6 +7,7 @@ using System;
 using System.IO;
 using System.Text;
 using static UnityEngine.GridBrushBase;
+using UnityEditor.PackageManager;
 
 namespace DAPolyPaint
 {
@@ -52,7 +53,8 @@ namespace DAPolyPaint
         private bool _anyModifiers = false;
         private int _savedTool;
         private bool _autoSave = false;
-        private bool _CursorOverObject;
+        //private bool _CursorOverObject;
+        private RaycastHit _lastHit_mirror;
         const float _statusColorBarHeight = 3;
         private const string DummyName = "$pp_dummy$";
         public readonly Color ColorStatusReady = Color.green;
@@ -452,12 +454,13 @@ namespace DAPolyPaint
         }
 
         /// <summary>
-        /// Does a raycast and updates _prevFace and _lastFace
+        /// Does a raycast and updates _prevFace and _lastFace. 
         /// </summary>
         private void DoFaceHit(SceneView sv, Vector2 currMousePos)
         {
             _prevFace = _lastFace;
-            _lastFace = GetFaceHit(sv, currMousePos);
+            int mirrored;
+            (_lastFace, mirrored)  = GetFaceHit(sv, currMousePos, _mirrorCursor);
             if (_prevFace == -1 && _lastFace >= 0)
             {
                 OnCursorEnterObject(sv.position);
@@ -467,15 +470,18 @@ namespace DAPolyPaint
             }
         }
         
-        int GetFaceHit(SceneView sv, Vector2 currMousePos, bool needCursorRays = true)
+        //Does a face hit, return face, also mirroered face if needed.
+        (int,int) GetFaceHit(SceneView sv, Vector2 currMousePos, bool mirrorHit = false)
         {
             int result = -1;
+            int result_mirror = -1;
             if (_targetMesh != null)
             {
 
                 _currMousePosCam = currMousePos;
                 _currMousePosCam.y = sv.camera.pixelHeight - _currMousePosCam.y;
                 var ray = sv.camera.ScreenPointToRay(_currMousePosCam);
+                Ray mirror_ray = ray; 
 
                 //var coll = _targetObject.GetComponent<MeshCollider>();
                 var coll = _dummyCollider;
@@ -484,36 +490,63 @@ namespace DAPolyPaint
                     if (coll.Raycast(ray, out _lastHit, 100f))
                     {
                         result = _lastHit.triangleIndex;
+                    }                    
+
+                    if (mirrorHit)
+                    {
+
+                        mirror_ray.direction = MirrorFromPivot(ray.direction, false);
+                        mirror_ray.origin = MirrorFromPivot(ray.origin);
+
+                        if (coll.Raycast(mirror_ray, out _lastHit_mirror, 100f))
+                        {
+                            result_mirror = _lastHit_mirror.triangleIndex;
+                        }
+
                     }
-                    if (needCursorRays) UpdateCursorRays(result, _lastHit, ray);
-                } else
+
+                    UpdateCursorRays(result, result_mirror);
+
+                } else 
                 {
                     Debug.LogWarning("No collider to do raycast.");
                 }
             }
-            return result;
+            return (result, result_mirror);
         }
 
-        void UpdateCursorRays(int faceResult, RaycastHit hitInfo, Ray cameraRay)
+        Vector3 MirrorFromPivot(Vector3 vec, bool isPosition = true) 
+        { 
+            var plane = -_targetObject.transform.right;
+            var origin = _targetObject.transform.position;
+            if (isPosition)
+            {
+                return Vector3.Reflect(vec - origin, plane) + origin;
+            } else {
+                return Vector3.Reflect(vec, plane);
+            }
+        }
+
+        void UpdateCursorRays(int faceResult,  int mirror_faceResult)
         {
             if (faceResult>0 )
             {
                 PaintEditor.CursorRays[0].enabled = true;
-                PaintEditor.CursorRays[0].direction = hitInfo.normal;
-                PaintEditor.CursorRays[0].origin = hitInfo.point;    
-                if (_mirrorCursor)
-                {
-                    //TODO: mirror the hit to get the mirrorer ray
-                    var plane = -_targetObject.transform.right;
-                    var origin = _targetObject.transform.position;
-                    PaintEditor.CursorRays[1].enabled = true;
-                    PaintEditor.CursorRays[1].direction = Vector3.Reflect(hitInfo.normal, plane);
-                    PaintEditor.CursorRays[1].origin = Vector3.Reflect(hitInfo.point-origin, plane) + origin;
-                }
+                PaintEditor.CursorRays[0].direction = _lastHit.normal;
+                PaintEditor.CursorRays[0].origin = _lastHit.point;                 
 
             } else
             {
-                PaintEditor.CursorRays[0].enabled = false;
+                PaintEditor.CursorRays[0].enabled = false;                
+            }
+            if (mirror_faceResult > 0)
+            {
+                PaintEditor.CursorRays[1].enabled = true;
+                PaintEditor.CursorRays[1].direction = _lastHit_mirror.normal;
+                PaintEditor.CursorRays[1].origin = _lastHit_mirror.point;
+            }
+            else
+            {
                 PaintEditor.CursorRays[1].enabled = false;
             }
         }
@@ -577,14 +610,14 @@ namespace DAPolyPaint
 
         private void OnCursorEnterObject(Rect position)
         {
-            _CursorOverObject = true;
-            Debug.Log("Entering 3D object...");
+            //_CursorOverObject = true;
+            //Debug.Log("Entering 3D object...");
         }
 
         private void OnCursorExitObject(Rect position)
         {
-            _CursorOverObject = false;
-            Debug.Log("Exiting 3D object...");
+            //_CursorOverObject = false;
+            //Debug.Log("Exiting 3D object...");
         }
 
         private void ProcessSceneEvents(SceneView scene, int id, Event ev)
