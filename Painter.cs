@@ -30,8 +30,6 @@ namespace DAPolyPaint
         private int _undoSequenceCount;
         int _channel = 0;
         Texture2D _textureData;
-        private Mesh _skinAffected;
-        private Vector3[] _verticesSkinned;
         private MeshCopy _oldMesh;
         
         public Mesh Target { get { return _targetMesh; } }
@@ -54,7 +52,6 @@ namespace DAPolyPaint
         {
             _targetMesh = target;
             _skinned = skinned;
-            _skinAffected = null;
             _textureData = texture;
             RebuildMeshForPainting();            
         }
@@ -204,7 +201,7 @@ namespace DAPolyPaint
         }
 
         ///<summary>Return array of Verts indices, no validations</summary>               
-        private int[] GetFaceVerts(int face)
+        private int[] GetFaceVertIdxs(int face)
         {
             return new int[] {
                 _indexedFaces[face*3],
@@ -280,7 +277,7 @@ namespace DAPolyPaint
             var myVerts = new int[3];
             for (int i = 0; i < NumFaces; i++)
             {                
-                var nearFaces = GetFacesUsingVerts(GetFaceVerts(i));
+                var nearFaces = GetFacesUsingVerts(GetFaceVertIdxs(i));
                 foreach (int f in nearFaces)
                 {
                    FindCoincidences(i, f);                   
@@ -394,54 +391,13 @@ namespace DAPolyPaint
             _targetMesh.SetUVs(_channel, _UVs);
         }
 
-        public void GetFaceVerts(int face, List<Vector3> verts )
-        {
-            verts.Clear();
-            if (face != -1)            {
-                if (_skinAffected == null)
-                {
-                    verts.Add(_vertices[face * 3]);
-                    verts.Add(_vertices[face * 3 + 1]);
-                    verts.Add(_vertices[face * 3 + 2]);
-                } else
-                {
-                    verts.Add(_verticesSkinned[face * 3]);
-                    verts.Add(_verticesSkinned[face * 3 + 1]);
-                    verts.Add(_verticesSkinned[face * 3 + 2]);
-                }
-            }
-        }
 
-        public void GetFaceVerts(int face, List<Vector3> verts, Matrix4x4 transformMat)
-        {
-            verts.Clear();
-            if (face != -1)
-            {
-                if (_skinAffected == null)
-                {
-                    verts.Add(transformMat.MultiplyPoint3x4(_vertices[face * 3]));
-                    verts.Add(transformMat.MultiplyPoint3x4(_vertices[face * 3 + 1]));
-                    verts.Add(transformMat.MultiplyPoint3x4(_vertices[face * 3 + 2])); 
-                } else
-                {
-                    verts.Add(transformMat.MultiplyPoint3x4(_verticesSkinned[face * 3]));
-                    verts.Add(transformMat.MultiplyPoint3x4(_verticesSkinned[face * 3 + 1]));
-                    verts.Add(transformMat.MultiplyPoint3x4(_verticesSkinned[face * 3 + 2]));
-                }
-            }
-        }
 
         public List<FaceLink> GetFaceLinks(int face)
         {
             return _faceLinks[face]; 
         }
 
-        //TODO: looks that something that should go in the constructor
-        public void SetSkinAffected(Mesh snapshot)
-        {
-            _skinAffected = snapshot;
-            _verticesSkinned = snapshot.vertices;
-        }
 
         public void FillPaint(int startFace, Vector2 uvc)
         {            

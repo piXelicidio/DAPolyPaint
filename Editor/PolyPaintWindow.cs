@@ -26,7 +26,10 @@ namespace DAPolyPaint
         GameObject _dummyObject;
         MeshCollider _dummyCollider;
         Mesh _targetMesh;
+        private Vector3[] _vertices;
         private bool _skinned;
+        private Mesh _skinAffected;
+        private Vector3[] _verticesSkinned;
         Texture _targetTexture;
         Texture2D _textureData;
         Vector3 _currMousePosCam;
@@ -786,6 +789,46 @@ namespace DAPolyPaint
             }
         }
 
+        public void GetFaceVerts(int face, List<Vector3> verts)
+        {
+            verts.Clear();
+            if (face != -1)
+            {
+                if (_skinAffected == null)
+                {
+                    verts.Add(_vertices[face * 3]);
+                    verts.Add(_vertices[face * 3 + 1]);
+                    verts.Add(_vertices[face * 3 + 2]);
+                }
+                else
+                {
+                    verts.Add(_verticesSkinned[face * 3]);
+                    verts.Add(_verticesSkinned[face * 3 + 1]);
+                    verts.Add(_verticesSkinned[face * 3 + 2]);
+                }
+            }
+        }
+
+        public void GetFaceVerts(int face, List<Vector3> verts, Matrix4x4 transformMat)
+        {
+            verts.Clear();
+            if (face != -1)
+            {
+                if (_skinAffected == null)
+                {
+                    verts.Add(transformMat.MultiplyPoint3x4(_vertices[face * 3]));
+                    verts.Add(transformMat.MultiplyPoint3x4(_vertices[face * 3 + 1]));
+                    verts.Add(transformMat.MultiplyPoint3x4(_vertices[face * 3 + 2]));
+                }
+                else
+                {
+                    verts.Add(transformMat.MultiplyPoint3x4(_verticesSkinned[face * 3]));
+                    verts.Add(transformMat.MultiplyPoint3x4(_verticesSkinned[face * 3 + 1]));
+                    verts.Add(transformMat.MultiplyPoint3x4(_verticesSkinned[face * 3 + 2]));
+                }
+            }
+        }
+
         private void BuildLoopCursor(int fromFace, int toFace, bool clearPolyCursor)
         {
             var loop = _painter.FindLoop(fromFace, toFace);
@@ -797,7 +840,7 @@ namespace DAPolyPaint
             foreach (var f in loop)
             {
                 var poly = new PolyFace();
-                _painter.GetFaceVerts(f, poly, _targetObject.transform.localToWorldMatrix);
+                GetFaceVerts(f, poly, _targetObject.transform.localToWorldMatrix);
                 poly.FaceNum = f;
                 PaintEditor.PolyCursor.Add(poly);
             }
@@ -844,7 +887,7 @@ namespace DAPolyPaint
         private PolyFace CreatePoly(int faceNum)
         {
             var poly = new PolyFace();
-            _painter.GetFaceVerts(faceNum, poly, _targetObject.transform.localToWorldMatrix);
+            GetFaceVerts(faceNum, poly, _targetObject.transform.localToWorldMatrix);
             poly.FaceNum = faceNum;
             return poly;
         }
@@ -943,6 +986,7 @@ namespace DAPolyPaint
                 
                 LogMeshInfo(_targetMesh);
                 _painter.SetMeshAndRebuild(_targetMesh, _skinned, _textureData);
+                _vertices = _targetMesh.vertices;
                 if (!_skinned)
                 {
                     _dummyCollider.sharedMesh = _targetMesh;
@@ -953,8 +997,10 @@ namespace DAPolyPaint
                     var smr = _targetObject.GetComponent<SkinnedMeshRenderer>();
                     var snapshot = new Mesh();
                     smr.BakeMesh(snapshot, true);
-                    _dummyCollider.sharedMesh = snapshot; 
-                    _painter.SetSkinAffected(snapshot);
+                    _dummyCollider.sharedMesh = snapshot;
+
+                    _skinAffected = snapshot;
+                    _verticesSkinned = snapshot.vertices;
                 }
                 _lastFace = -1;                
             }
