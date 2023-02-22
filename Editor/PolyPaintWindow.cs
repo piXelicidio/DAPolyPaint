@@ -34,6 +34,7 @@ namespace DAPolyPaint
         RaycastHit _lastHit;
         int _lastFace; //last face hit by raycast
         int _prevFace; //previous face hit by raycast;
+        private int _prevFace_Mirror;
         private PaintCursor _paintCursor;
         Vector2 _lastUVpick;
         private Color _lastPixelColor;
@@ -55,6 +56,7 @@ namespace DAPolyPaint
         private bool _autoSave = false;
         //private bool _CursorOverObject;
         private RaycastHit _lastHit_mirror;
+        private int _lastFace_Mirror;
         const float _statusColorBarHeight = 3;
         private const string DummyName = "$pp_dummy$";
         public readonly Color ColorStatusReady = Color.green;
@@ -459,8 +461,8 @@ namespace DAPolyPaint
         private void DoFaceHit(SceneView sv, Vector2 currMousePos)
         {
             _prevFace = _lastFace;
-            int mirrored;
-            (_lastFace, mirrored)  = GetFaceHit(sv, currMousePos, _mirrorCursor);
+            _prevFace_Mirror = _lastFace_Mirror;
+            (_lastFace, _lastFace_Mirror)  = GetFaceHit(sv, currMousePos, _mirrorCursor);
             if (_prevFace == -1 && _lastFace >= 0)
             {
                 OnCursorEnterObject(sv.position);
@@ -701,9 +703,12 @@ namespace DAPolyPaint
                 BuildCursor();
                 if (tool == "Fill")
                 {
-                    if (_lastFace != -1)
+                    var anyFace = _lastFace >= 0;
+                    var anyMirror = (_mirrorCursor && _lastFace_Mirror >= 0);
+                    if (anyFace || anyMirror)
                     {
-                        _painter.FillPaint(_lastFace, _lastUVpick);
+                        if (anyFace) _painter.FillPaint(_lastFace, _lastUVpick);
+                        if (anyMirror) _painter.FillPaint(_lastFace_Mirror, _lastUVpick);
                         _painter.Undo_SaveState();
                     }
                 }
@@ -728,7 +733,8 @@ namespace DAPolyPaint
                     if (tool == "Loop")
                     {
                         Debug.Log(String.Format("Ctrl+drag: From {0} to {1}", _prevFace, _lastFace));
-                        BuildLoopCursor(_prevFace, _lastFace);
+                        BuildLoopCursor(_prevFace, _lastFace, true);
+                        if (_mirrorCursor) BuildLoopCursor(_prevFace_Mirror, _lastFace_Mirror, false);
                         //scene.Repaint();
                         //PaintUsingCursor();
                     }
@@ -780,13 +786,13 @@ namespace DAPolyPaint
             }
         }
 
-        private void BuildLoopCursor(int fromFace, int toFace)
+        private void BuildLoopCursor(int fromFace, int toFace, bool clearPolyCursor)
         {
             var loop = _painter.FindLoop(fromFace, toFace);
             var loopBack = _painter.FindLoop(toFace, fromFace);
             loop.UnionWith(loopBack);
 
-            PaintEditor.PolyCursor.Clear();
+            if (clearPolyCursor) PaintEditor.PolyCursor.Clear();
 
             foreach (var f in loop)
             {
@@ -795,7 +801,6 @@ namespace DAPolyPaint
                 poly.FaceNum = f;
                 PaintEditor.PolyCursor.Add(poly);
             }
-            Debug.Log("loop faces: " + PaintEditor.PolyCursor.Count.ToString());
 
         }
 
@@ -822,6 +827,9 @@ namespace DAPolyPaint
             }
         }
 
+        /// <summary>
+        /// Apply the painting using the current cursor info, that may include multiple faces.
+        /// </summary>
         private void PaintUsingCursor()
         {
             foreach (var polyFace in PaintEditor.PolyCursor)
@@ -830,35 +838,46 @@ namespace DAPolyPaint
             }
         }
 
+        /// <summary>
+        /// Given a face number return a list of vertices in World Coord. System.
+        /// </summary>
+        private PolyFace CreatePoly(int faceNum)
+        {
+            var poly = new PolyFace();
+            _painter.GetFaceVerts(faceNum, poly, _targetObject.transform.localToWorldMatrix);
+            poly.FaceNum = faceNum;
+            return poly;
+        }
+
+        /// <summary>
+        /// Builds the data (vertex positions) for the polyline cursor
+        /// </summary>
         private void BuildCursor()
         {
             PaintEditor.PolyCursor.Clear();
-            if (_lastFace != -1)
-            {
-                var poly = new PolyFace();
-                _painter.GetFaceVerts(_lastFace, poly, _targetObject.transform.localToWorldMatrix);
-                poly.FaceNum = _lastFace;
-                PaintEditor.PolyCursor.Add(poly);
-
-
+            if (_lastFace >= 0)
+            {                
+                PaintEditor.PolyCursor.Add(CreatePoly(_lastFace));
                 if (_autoQuads)
                 {
                     var quadBro = _painter.FindQuad(_lastFace);
                     if (quadBro != -1)
+                    {                        
+                        PaintEditor.PolyCursor.Add(CreatePoly(quadBro));
+                    }
+                }                
+            }
+            if (_mirrorCursor&&(_lastFace_Mirror >= 0 ))
+            {
+                PaintEditor.PolyCursor.Add(CreatePoly(_lastFace_Mirror));
+                if (_autoQuads)
+                {
+                    var quadBro = _painter.FindQuad(_lastFace_Mirror);
+                    if (quadBro != -1)
                     {
-                        poly = new PolyFace();
-                        poly.FaceNum = quadBro;
-                        _painter.GetFaceVerts(quadBro, poly, _targetObject.transform.localToWorldMatrix);
-                        PaintEditor.PolyCursor.Add(poly);
+                        PaintEditor.PolyCursor.Add(CreatePoly(quadBro));
                     }
                 }
-                //adding all linked faces
-                //foreach (var link in _painter.GetFaceLinks(_lastFace))
-                //{
-                //    poly = new List<Vector3>();
-                //    _painter.GetFaceVerts(link.with, poly, _targetObject.transform.localToWorldMatrix);
-                //    PaintEditor.PolyCursor.Add(poly);
-                //}
             }
         }
 
