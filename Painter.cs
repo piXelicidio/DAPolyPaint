@@ -450,6 +450,7 @@ namespace DAPolyPaint
             border.Add(startFace);
             var neighbors = new HashSet<int>();
             var iters = 0;
+            var visited = new bool[NumFaces];
 
             var t = Environment.TickCount;
 
@@ -460,8 +461,8 @@ namespace DAPolyPaint
                 {
                     _UVs[face * 3] = uvc;
                     _UVs[face * 3 + 1] = uvc;
-                    _UVs[face * 3 + 2] = uvc;             
-                    
+                    _UVs[face * 3 + 2] = uvc;
+                    visited[face] = true;
                 }
                 _targetMesh.SetUVs(_channel, _UVs);  //can be called at the end just once
                 //find neighbors
@@ -470,11 +471,11 @@ namespace DAPolyPaint
                 foreach (int face in border)
                 {
                     var faceLinks = GetFaceLinks(face);
-                    foreach (var l in faceLinks)
+                    foreach (var link in faceLinks)
                     {
-                        if (GetTextureColor(_UVs[l.with*3]) == bk_pixelColor)
+                        if (GetTextureColor(_UVs[link.with*3]) == bk_pixelColor && !visited[link.with])
                         {
-                            neighbors.Add(l.with);                            
+                            neighbors.Add(link.with);                            
                         }
                         else noSpread++;
                     }
