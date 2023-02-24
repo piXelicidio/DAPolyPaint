@@ -45,7 +45,10 @@ namespace DAPolyPaint
         private MeshCollider _meshCollider;
         private bool _autoQuads = true;
         private bool _mirrorCursor = false;
+        private int _currMirrorAxis;
+        private float _axisOffset;
         private string[] _toolNames = new string[] { "Brush", "Fill", "Loop", "Pick" };
+        private string[] _mirrorAxis = new string[] { "X", "Y", "Z" };
         private GUIContent[] _toolNames_gc = new GUIContent[] 
             {
                 new GUIContent("Bursh", "Paint Faces"),  
@@ -164,7 +167,16 @@ namespace DAPolyPaint
                 _autoQuads = EGL.ToggleLeft("Auto-detect quads", _autoQuads);
                 //EGL.PrefixLabel("Max quad tolerance:");
                 //if (_painter!=null)  _painter.QuadTolerance = EGL.Slider(_painter.QuadTolerance, 0.1f, 360f);
-                _mirrorCursor = EGL.ToggleLeft(new GUIContent("Mirror Cursor", ""), _mirrorCursor);
+                _mirrorCursor = EGL.ToggleLeft(new GUIContent("Mirror Cursor. Axis:", ""), _mirrorCursor);
+                PaintEditor.MirrorMode = _mirrorCursor;
+                using (new EditorGUI.DisabledScope(!_mirrorCursor))
+                {
+                    _currMirrorAxis = GUILayout.Toolbar(_currMirrorAxis, _mirrorAxis);
+                    _axisOffset = EGL.FloatField("Axis Offset:", _axisOffset);
+                    PaintEditor.ShowMirrorPlane = EGL.ToggleLeft("Show Mirror Plane", PaintEditor.ShowMirrorPlane);
+                    PaintEditor.MirrorAxis = _currMirrorAxis;
+                    PaintEditor.AxisOffset = _axisOffset;
+                }
                 OnGUI_SavePaintedMesh();
             }
 
@@ -1003,6 +1015,7 @@ namespace DAPolyPaint
                     _verticesSkinned = snapshot.vertices;
                 }
                 _lastFace = -1;                
+                _dummyObject.GetComponent<PaintCursor>().TargetMesh = _targetMesh;
             }
             else
             {
@@ -1066,7 +1079,7 @@ namespace DAPolyPaint
             return texture2D;
         }
 
-
+       
 
 
 
@@ -1096,8 +1109,13 @@ namespace DAPolyPaint
         static PolyList _polyCursor = new PolyList();
 
         public static bool PaintMode { get; set; }
+        public static bool MirrorMode { get; set; }
+        public static int MirrorAxis { get; set; }
+        public static bool ShowMirrorPlane { get; set; }
+        public static float AxisOffset { get; set; }
         public static PolyList PolyCursor { get { return _polyCursor; }}
         public static CursorRay[] CursorRays = new CursorRay[2];
+        private static Vector3[] _mirrorPlane = new Vector3[5];
 
         public static void SetPixelColor(Color c)
         {
@@ -1140,9 +1158,44 @@ namespace DAPolyPaint
                         Gizmos.DrawLine(ray.origin, v2);        
                     }
                 }
+
+                //mirror axis..
+                if (MirrorMode && ShowMirrorPlane)
+                {
+                    var min = obj.TargetMesh.bounds.min;
+                    var max = obj.TargetMesh.bounds.max;
+                    var mat = obj.transform.localToWorldMatrix;
+                    if (MirrorAxis == 0)                    
+                    {                        
+                        _mirrorPlane[0].Set(0, max.y, max.z);
+                        _mirrorPlane[1].Set(0, min.y, max.z);
+                        _mirrorPlane[2].Set(0, min.y, min.z);
+                        _mirrorPlane[3].Set(0, max.y, min.z);
+                        _mirrorPlane[4].Set(0, max.y, max.z);                        
+                    } else if (MirrorAxis == 1)
+                    {
+
+                    } else if (MirrorAxis == 2)
+                    {
+
+                    }
+                    TransformVectorArray(mat, ref _mirrorPlane);
+                    for (var i = 0; i < _mirrorPlane.Length - 1; i++)
+                    {
+                        Gizmos.DrawLine(_mirrorPlane[i], _mirrorPlane[i + 1]);
+                    }
+                }
             }
             
 	    }
+
+        static void TransformVectorArray(Matrix4x4 matrix, ref Vector3[] vectors)
+        {
+            for (int i = 0; i < vectors.Length; i++)
+            {
+                vectors[i] = matrix.MultiplyPoint(vectors[i]);
+            }
+        }
 
         //void OnSceneGUI()
         //{
