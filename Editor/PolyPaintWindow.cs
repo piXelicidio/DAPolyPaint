@@ -126,6 +126,7 @@ namespace DAPolyPaint
             _paintingMode = false;
             SceneView.lastActiveSceneView.Repaint();
             PaintEditor.PaintMode = false;
+            _paintCursor.enabled = false;
             //DestroyImmediate(_dummyObject);
         }
 
@@ -176,6 +177,7 @@ namespace DAPolyPaint
                     PaintEditor.ShowMirrorPlane = EGL.ToggleLeft("Show Mirror Plane", PaintEditor.ShowMirrorPlane);
                     PaintEditor.MirrorAxis = _currMirrorAxis;
                     PaintEditor.AxisOffset = _axisOffset;
+                    SceneView.lastActiveSceneView.Repaint();
                 }
                 OnGUI_SavePaintedMesh();
             }
@@ -534,7 +536,15 @@ namespace DAPolyPaint
 
         Vector3 MirrorFromPivot(Vector3 vec, bool isPosition = true) 
         { 
-            var plane = -_targetObject.transform.right;
+            var plane = _targetObject.transform.right; //X
+            if (_currMirrorAxis == 1) //Y
+            {
+                plane = _targetObject.transform.up;
+            } else if (_currMirrorAxis == 2)
+            {
+                plane = _targetObject.transform.forward;
+            }
+
             var origin = _targetObject.transform.position;
             if (isPosition)
             {
@@ -1014,8 +1024,9 @@ namespace DAPolyPaint
                     _skinAffected = snapshot;
                     _verticesSkinned = snapshot.vertices;
                 }
-                _lastFace = -1;                
-                _dummyObject.GetComponent<PaintCursor>().TargetMesh = _targetMesh;
+                _lastFace = -1;                                
+                _paintCursor.TargetMesh = _targetMesh;
+                _paintCursor.enabled = true;
             }
             else
             {
@@ -1048,7 +1059,6 @@ namespace DAPolyPaint
 
             _paintCursor = dummy.GetComponent<PaintCursor>();
             if (_paintCursor == null) _paintCursor = dummy.AddComponent<PaintCursor>();
-            
 
             collider.hideFlags = HideFlags.HideInHierarchy; 
             return (dummy, collider);
@@ -1171,13 +1181,21 @@ namespace DAPolyPaint
                         _mirrorPlane[1].Set(0, min.y, max.z);
                         _mirrorPlane[2].Set(0, min.y, min.z);
                         _mirrorPlane[3].Set(0, max.y, min.z);
-                        _mirrorPlane[4].Set(0, max.y, max.z);                        
+                        _mirrorPlane[4] = _mirrorPlane[0];
                     } else if (MirrorAxis == 1)
                     {
-
+                        _mirrorPlane[0].Set(max.x, 0, max.z);
+                        _mirrorPlane[1].Set(min.x, 0, max.z);
+                        _mirrorPlane[2].Set(min.x, 0, min.z);
+                        _mirrorPlane[3].Set(max.x, 0, min.z);
+                        _mirrorPlane[4] = _mirrorPlane[0];
                     } else if (MirrorAxis == 2)
                     {
-
+                        _mirrorPlane[0].Set(max.x, max.y, 0);
+                        _mirrorPlane[1].Set(min.x, max.y, 0);
+                        _mirrorPlane[2].Set(min.x, min.y, 0);
+                        _mirrorPlane[3].Set(max.x, min.y, 0);
+                        _mirrorPlane[4] = _mirrorPlane[0];
                     }
                     TransformVectorArray(mat, ref _mirrorPlane);
                     for (var i = 0; i < _mirrorPlane.Length - 1; i++)
