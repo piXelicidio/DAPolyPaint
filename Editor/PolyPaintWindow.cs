@@ -1214,6 +1214,7 @@ namespace DAPolyPaint
             TransformVectorArray(mat, ref _mirrorPlane);
             for (var i = 0; i < _mirrorPlane.Length - 1; i++)
             {
+                Gizmos.color = i == 1 ? Color.white : Color.gray;
                 Gizmos.DrawLine(_mirrorPlane[i] + offset, _mirrorPlane[i + 1] + offset);
             }
         }
