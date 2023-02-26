@@ -13,6 +13,7 @@
 - Click **START PAINT MODE** on the Poly Paint window.
 - Select any color by clicking the texture box.
 - Use **Brush**, **Fill** and **Loop** tools to paint and **Pick** to pick a color direclty from the mesh.
+- Check **Mirror Cursor** to activate mirrored painting.
 
 *Keyboard shortcuts:*
 - **Ctrl** = Fill
