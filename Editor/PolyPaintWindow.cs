@@ -47,8 +47,8 @@ namespace DAPolyPaint
         private bool _mirrorCursor = false;
         private int _currMirrorAxis;
         private float _axisOffset;
-        private string[] _toolNames = new string[] { "Brush", "Fill", "Loop", "Pick" };
-        private string[] _mirrorAxis = new string[] { "X", "Y", "Z" };
+        private readonly string[] _toolNames = new string[] { "Brush", "Fill", "Loop", "Pick" };
+        private readonly string[] _mirrorAxis = new string[] { "X", "Y", "Z" };
         private GUIContent[] _toolNames_gc = new GUIContent[] 
             {
                 new GUIContent("Bursh", "Paint Faces"),  
@@ -177,7 +177,7 @@ namespace DAPolyPaint
                     PaintEditor.ShowMirrorPlane = EGL.ToggleLeft("Show Mirror Plane", PaintEditor.ShowMirrorPlane);
                     PaintEditor.MirrorAxis = _currMirrorAxis;
                     PaintEditor.AxisOffset = _axisOffset;
-                    SceneView.lastActiveSceneView.Repaint();
+                    if (PaintEditor.ShowMirrorPlane) SceneView.lastActiveSceneView.Repaint();
                 }
                 OnGUI_SavePaintedMesh();
             }
@@ -513,7 +513,6 @@ namespace DAPolyPaint
 
                     if (mirrorHit)
                     {
-
                         mirror_ray.direction = MirrorFromPivot(ray.direction, false);
                         mirror_ray.origin = MirrorFromPivot(ray.origin);
 
@@ -534,18 +533,19 @@ namespace DAPolyPaint
             return (result, result_mirror);
         }
 
+        public static Vector3 AxisDirection(int axis, Transform transform)
+        {
+            if (axis == 0) return transform.right;      //X
+            else if (axis == 1 ) return transform.up;   //Y
+            else return transform.forward;                   //Z
+        }
+
         Vector3 MirrorFromPivot(Vector3 vec, bool isPosition = true) 
         { 
-            var plane = _targetObject.transform.right; //X
-            if (_currMirrorAxis == 1) //Y
-            {
-                plane = _targetObject.transform.up;
-            } else if (_currMirrorAxis == 2)
-            {
-                plane = _targetObject.transform.forward;
-            }
+            var plane = PolyPaintWindow.AxisDirection(_currMirrorAxis, _targetObject.transform);
+            Vector3 offset = plane * _axisOffset;
 
-            var origin = _targetObject.transform.position;
+            var origin = _targetObject.transform.position + offset;
             if (isPosition)
             {
                 return Vector3.Reflect(vec - origin, plane) + origin;
@@ -1136,6 +1136,7 @@ namespace DAPolyPaint
         [DrawGizmo(GizmoType.Selected | GizmoType.NonSelected)]
         static void DrawGizmos(PaintCursor obj, GizmoType gizmoType) //need to be static
         {
+            if (!obj.enabled) return; 
             if (PaintMode)
             {
                 //Drawing cursor triangles
@@ -1172,40 +1173,50 @@ namespace DAPolyPaint
                 //mirror axis..
                 if (MirrorMode && ShowMirrorPlane)
                 {
-                    var min = obj.TargetMesh.bounds.min;
-                    var max = obj.TargetMesh.bounds.max;
-                    var mat = obj.transform.localToWorldMatrix;
-                    if (MirrorAxis == 0)                    
-                    {                        
-                        _mirrorPlane[0].Set(0, max.y, max.z);
-                        _mirrorPlane[1].Set(0, min.y, max.z);
-                        _mirrorPlane[2].Set(0, min.y, min.z);
-                        _mirrorPlane[3].Set(0, max.y, min.z);
-                        _mirrorPlane[4] = _mirrorPlane[0];
-                    } else if (MirrorAxis == 1)
-                    {
-                        _mirrorPlane[0].Set(max.x, 0, max.z);
-                        _mirrorPlane[1].Set(min.x, 0, max.z);
-                        _mirrorPlane[2].Set(min.x, 0, min.z);
-                        _mirrorPlane[3].Set(max.x, 0, min.z);
-                        _mirrorPlane[4] = _mirrorPlane[0];
-                    } else if (MirrorAxis == 2)
-                    {
-                        _mirrorPlane[0].Set(max.x, max.y, 0);
-                        _mirrorPlane[1].Set(min.x, max.y, 0);
-                        _mirrorPlane[2].Set(min.x, min.y, 0);
-                        _mirrorPlane[3].Set(max.x, min.y, 0);
-                        _mirrorPlane[4] = _mirrorPlane[0];
-                    }
-                    TransformVectorArray(mat, ref _mirrorPlane);
-                    for (var i = 0; i < _mirrorPlane.Length - 1; i++)
-                    {
-                        Gizmos.DrawLine(_mirrorPlane[i], _mirrorPlane[i + 1]);
-                    }
+                    DrawMirrorPlane(obj);
                 }
             }
             
 	    }
+
+        private static void DrawMirrorPlane(PaintCursor obj)
+        {
+            var min = obj.TargetMesh.bounds.min;
+            var max = obj.TargetMesh.bounds.max;
+            var mat = obj.transform.localToWorldMatrix;
+            var axisDir = PolyPaintWindow.AxisDirection(MirrorAxis, obj.transform);
+            Vector3 offset = AxisOffset * axisDir;            
+
+            if (MirrorAxis == 0)
+            {
+                _mirrorPlane[0].Set(0, max.y, max.z);
+                _mirrorPlane[1].Set(0, min.y, max.z);
+                _mirrorPlane[2].Set(0, min.y, min.z);
+                _mirrorPlane[3].Set(0, max.y, min.z);
+                _mirrorPlane[4] = _mirrorPlane[0];
+            }
+            else if (MirrorAxis == 1)
+            {
+                _mirrorPlane[0].Set(max.x, 0, max.z);
+                _mirrorPlane[1].Set(min.x, 0, max.z);
+                _mirrorPlane[2].Set(min.x, 0, min.z);
+                _mirrorPlane[3].Set(max.x, 0, min.z);
+                _mirrorPlane[4] = _mirrorPlane[0];
+            }
+            else if (MirrorAxis == 2)
+            {
+                _mirrorPlane[0].Set(max.x, max.y, 0);
+                _mirrorPlane[1].Set(min.x, max.y, 0);
+                _mirrorPlane[2].Set(min.x, min.y, 0);
+                _mirrorPlane[3].Set(max.x, min.y, 0);
+                _mirrorPlane[4] = _mirrorPlane[0];
+            }
+            TransformVectorArray(mat, ref _mirrorPlane);
+            for (var i = 0; i < _mirrorPlane.Length - 1; i++)
+            {
+                Gizmos.DrawLine(_mirrorPlane[i] + offset, _mirrorPlane[i + 1] + offset);
+            }
+        }
 
         static void TransformVectorArray(Matrix4x4 matrix, ref Vector3[] vectors)
         {
