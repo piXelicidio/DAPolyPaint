@@ -4,8 +4,8 @@ using System.Linq;
 using System.Security.Cryptography;
 using UnityEngine;
 
-
-namespace DAPolyPaint
+ 
+namespace DAPolyPaint 
 {
     /// <summary>
     /// Deals with Mesh and UV painting functions. Can be used in play mode.
@@ -492,7 +492,7 @@ namespace DAPolyPaint
             {
                 result.Add(f2);
                 bool noOverlaps = true;
-                Debug.Log("Let's find the loop!");
+                //Debug.Log("Let's find the loop!");
                 var breakLimit = 20;
                 do
                 {
@@ -562,7 +562,7 @@ namespace DAPolyPaint
                 _undoPos--;
                 _undoSequenceCount++;
             }
-            Debug.Log(String.Format("cursor{0} count{1}", _undoPos, _undoLevels.Count));
+            //Debug.Log(String.Format("cursor{0} count{1}", _undoPos, _undoLevels.Count));
         }
 
         public void Undo_Redo()
@@ -578,6 +578,11 @@ namespace DAPolyPaint
                 }
                 _targetMesh.SetUVs(_channel, _UVs);
             }
+        }
+
+        public bool isModified()
+        {
+            return _undoPos > 0;
         }
 
 

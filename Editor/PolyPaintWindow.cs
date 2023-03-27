@@ -9,7 +9,7 @@ using System.Text;
 using static UnityEngine.GridBrushBase;
 using UnityEditor.PackageManager;
 
-namespace DAPolyPaint
+namespace DAPolyPaint 
 {
     /// <summary>
     /// GUI Editor Window for PolyPaint
@@ -106,7 +106,7 @@ namespace DAPolyPaint
             {
                 SaveMeshAsset();
             }
-            else
+            else if (_painter.isModified())
             {
                 var discard = EditorUtility.DisplayDialog("Discard changes?",
                     "Discard all changes from this paint session?", "Discard", "Apply");
@@ -700,12 +700,12 @@ namespace DAPolyPaint
                     if (ev.keyCode == KeyCode.Z)
                     {
                         //catching Ctrl+Z
-                        Debug.Log("Ctrl+Z: Undo");
+                        //Debug.Log("Ctrl+Z: Undo");
                         _painter.Undo_Undo();
                     }
                     else if (ev.keyCode == KeyCode.Y)
                     {
-                        Debug.Log("Ctrl+Y: Redo");
+                        //Debug.Log("Ctrl+Y: Redo");
                         _painter.Undo_Redo();
                     }
                 }
