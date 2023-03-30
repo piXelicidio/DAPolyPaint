@@ -5,7 +5,7 @@
 ![screenshot](docs~/da-polypaint-screenshot.jpg)
 
 *Installing:*
-- Downlaod or clone this code anywhere inside your Unity project assets.
+- Download or clone this code anywhere inside your Unity project assets.
 - Open the tool with Unity Main **Menu > DA-Tools > Poly Paint**
 ---
 *Using:*
