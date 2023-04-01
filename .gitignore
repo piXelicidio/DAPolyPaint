@@ -61,3 +61,7 @@ crashlytics-build.properties
 #manual
 LICENSE.meta
 README.md.meta
+README-toPDF.md
+README-toPDF.md.meta
+README.pdf
+README.pdf.meta
