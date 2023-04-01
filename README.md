@@ -9,7 +9,7 @@
 
 ## Introduction <a name="introduction"></a>
 
-[![Youtube Video](docs~/youtubeThumbnail.jpg)](https://www.youtube.com/watch?v=wEDbnaEky0Y)
+[![Youtube Video](docs~/youtubeThumbnail.jpg)*Watch YouTube Video*](https://www.youtube.com/watch?v=wEDbnaEky0Y)
 
 DA Poly Paint is an easy to use Polygon Painting tool for Unity, offering an alternative to [pX Poly Paint for 3ds Max](https://github.com/piXelicidio/pxMaxScript/tree/master/PolyPainter). With DA Poly Paint, you can easily customize your low-poly models directly within the Unity environment, saving time and effort on traditional UV mapping and texturing tasks.
 
