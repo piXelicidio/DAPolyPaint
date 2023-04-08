@@ -420,7 +420,7 @@ TextMesh:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1498063578}
-  m_Text: ^ Main Menu > DA-Tools > Poly Paint
+  m_Text: ^ Main Menu > Tools > DA > Poly Paint
   m_OffsetZ: 0
   m_CharacterSize: 0.05
   m_LineSpacing: 1
