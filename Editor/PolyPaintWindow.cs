@@ -70,12 +70,12 @@ namespace DAPolyPaint
         public readonly Color ColorStatusPainting = new Color(1, 0.4f, 0);//orange
         public readonly Color ColorStatusError = Color.red;
 
-        [MenuItem("DA-Tools/Poly Paint")]
+        [MenuItem("Tools/DA/Poly Paint")]
         public static void ShowWindow()
         {
             var ew =(PolyPaintWindow) EditorWindow.GetWindow(typeof(PolyPaintWindow));
             if (ew._painter == null) ew._painter = new Painter();
-            ew.titleContent = new GUIContent("Poly Paint");
+            ew.titleContent = new GUIContent("DA Poly Paint");
         }
 
         public void CreateGUI()
