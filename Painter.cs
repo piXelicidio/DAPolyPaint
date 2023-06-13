@@ -235,8 +235,8 @@ namespace DAPolyPaint
             {
                 if (face1 == face2) return;                
                 var count = 0;
-                int[] pos = new int[2];
-                int[] posOther = new int[2];
+                int[] pos = new int[3];
+                int[] posOther = new int[3];
                 for (int p1 = 0; p1 < 3; p1++)
                 {
                     for (int p2 = 0; p2 < 3; p2++)
@@ -251,6 +251,7 @@ namespace DAPolyPaint
                     }
                 }
                 //ignoring single shared vertices.
+                //ignoring three shared vertices = overlaping face.
                 if (count == 2)
                 {
                     //there is connection:
