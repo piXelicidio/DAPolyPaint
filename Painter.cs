@@ -25,6 +25,7 @@ namespace DAPolyPaint
         int[] _indexedFaces;
         float[] _angles;                //angle of each triangle corners
         List<FaceLink>[] _faceLinks;
+        FaceData[] _faceData;
         List<List<Vector2>> _undoLevels;
         int _undoPos;
         private int _undoSequenceCount;
@@ -262,17 +263,34 @@ namespace DAPolyPaint
                     link.edge.v1 = _indexedFaces[face1 * 3 + pos[0]];
                     link.edge.v2 = _indexedFaces[face1 * 3 + pos[1]];
                     link.side = GetTriangleSide(pos[0], pos[1]);
-                    link.pOut = 3 - (pos[0] + pos[1]); //point left out                
+                    link.pOut = 3 - (pos[0] + pos[1]); //point left out
+                                                       
+                    var otherFaceSide = GetTriangleSide(posOther[0], posOther[1]);
+                    var otherLink = _faceData[face2].links[otherFaceSide];
+                    bool otherOk = otherLink == null;
+                    if (!otherOk)
+                    {
+                        otherOk = otherLink.with == face1;
+                    }
 
-                    _faceLinks[face1].Add(link);
+                    //my face side is unlinked?                    
+                    if (_faceData[face1].links[link.side] == null && otherOk)
+                    {
+                        //other face has this side unlinked or linked to me?                    
+                        
+                            _faceLinks[face1].Add(link);
+                            _faceData[face1].links[link.side] = link;                        
+                    }
                 }
             }
 
             var sum = 0.0f;
             _faceLinks = new List<FaceLink>[NumFaces];
+            _faceData = new FaceData[NumFaces];
             for (int i = 0; i < NumFaces; i++)
             {
                 _faceLinks[i] = new List<FaceLink>();
+                _faceData[i] = new FaceData();
             }
 
             var myVerts = new int[3];
@@ -292,8 +310,15 @@ namespace DAPolyPaint
                 sum += links.Count;
                 for (int j = 0; j < links.Count; j++)
                 {
-                    var backlink = _faceLinks[links[j].with].Find(x => x.with == i);
-                    backlink.backLinkIdx = j;
+                   var backlink = _faceLinks[links[j].with].Find(x => x.with == i);
+                    if (backlink != null)
+                    {
+                        backlink.backLinkIdx = j;
+                    } else
+                    {
+                        Debug.LogWarning("Backlink not found.");
+                    }
+
                 }
             }
             Debug.Log("Average Num Links: " + (sum / NumFaces).ToString());
@@ -633,6 +658,16 @@ namespace DAPolyPaint
         public int side;            //side of the tirangle: 0, 1, or 2;
         public int pOut;            //the vertice point that is not shared.
         public int backLinkIdx;     //position index on the other face List of links corresponding to this link O.o capichi      
+    }
+
+    public class FaceData
+    {
+        public FaceLink[] links;        
+
+        public FaceData()
+        {
+            links = new FaceLink[3];
+        }
     }
 
     public struct Edge
