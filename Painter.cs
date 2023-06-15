@@ -308,7 +308,7 @@ namespace DAPolyPaint
             {
                 var links = _faceLinks[i];
                 sum += links.Count;
-                for (int j = 0; j < links.Count; j++)
+                for (int j = links.Count-1; j >= 0; j--)
                 {
                    var backlink = _faceLinks[links[j].with].Find(x => x.with == i);
                     if (backlink != null)
@@ -316,7 +316,8 @@ namespace DAPolyPaint
                         backlink.backLinkIdx = j;
                     } else
                     {
-                        Debug.LogWarning("Backlink not found.");
+                        Debug.LogWarning("Backlink not found. Removing link.");
+                        links.RemoveAt(j);
                     }
 
                 }
@@ -356,7 +357,7 @@ namespace DAPolyPaint
                 var linkFrom = _faceLinks[faceOther][linkTo.backLinkIdx];
                 if (linkFrom.with != face)
                 {
-                    Debug.LogError("Bad backlinkIdx!");
+                    Debug.LogWarning("Bad backlinkIdx!");
                 }
 
                 
@@ -535,7 +536,7 @@ namespace DAPolyPaint
                             break;
                         };
                     }
-                    if (jumpToFace == -1) Debug.LogError("Why is happening? no oppsite side found?");
+                    if (jumpToFace == -1) Debug.LogWarning("No opposite side found!");
                     f1 = f2_quadBro;
                     f2 = jumpToFace;
                     noOverlaps = result.Add(f1) && result.Add(f2);
