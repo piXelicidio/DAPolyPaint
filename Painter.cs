@@ -78,39 +78,49 @@ namespace DAPolyPaint
             var newNormals = new List<Vector3>();
             var newBW = new BoneWeight[_oldMesh.tris.Length];
             //no more shared vertices, each triangle will have its own 3 vertices.
-            for (int i = 0; i < _oldMesh.tris.Length; i++)
+
+            for (int i = 0; i < _oldMesh.tris.Length; i += 3)
             {
-                var idx = _oldMesh.tris[i];
+                var idx1 = _oldMesh.tris[i];
+                var idx2 = _oldMesh.tris[i + 1];
+                var idx3 = _oldMesh.tris[i + 2];
+
+                // If the triangle is invalid, skip the rest of this loop iteration
+                if (_oldMesh.vertices[idx1] == _oldMesh.vertices[idx2] ||
+                    _oldMesh.vertices[idx1] == _oldMesh.vertices[idx3] ||
+                    _oldMesh.vertices[idx2] == _oldMesh.vertices[idx3])
+                {
+                    Debug.LogWarning("Invalid self-overlapping face removed.");
+                    continue;
+                }
+
                 newTris.Add(i);
-                newVertices.Add(_oldMesh.vertices[idx]);
-                newNormals.Add(_oldMesh.normals[idx]);
-                //also UVs but the 3 values will be the same
-                newUVs.Add(_oldMesh.UVs[_oldMesh.tris[i - i % 3]]);
+                newTris.Add(i + 1);
+                newTris.Add(i + 2);
+                newVertices.Add(_oldMesh.vertices[idx1]);
+                newVertices.Add(_oldMesh.vertices[idx2]);
+                newVertices.Add(_oldMesh.vertices[idx3]);
+                newNormals.Add(_oldMesh.normals[idx1]);
+                newNormals.Add(_oldMesh.normals[idx2]);
+                newNormals.Add(_oldMesh.normals[idx3]);
+                newUVs.Add(_oldMesh.UVs[_oldMesh.tris[i]]);
+                newUVs.Add(_oldMesh.UVs[_oldMesh.tris[i + 1]]);
+                newUVs.Add(_oldMesh.UVs[_oldMesh.tris[i + 2]]);
 
                 if (_skinned)
                 {
-                    newBW[i] = _oldMesh.boneWeights[idx];
+                    newBW[i] = _oldMesh.boneWeights[idx1];
+                    newBW[i + 1] = _oldMesh.boneWeights[idx2];
+                    newBW[i + 2] = _oldMesh.boneWeights[idx3];
                 }
             }
 
-            //updating mesh with new distribution of vertices
-            m.Clear();
-            if (newVertices.Count>60000) m.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
-            if (m.subMeshCount > 1) m.subMeshCount = 1; //NOT support for multiple submeshes.
-            m.SetVertices(newVertices);
-            m.SetUVs(_channel, newUVs);            
-            m.SetTriangles(newTris, 0);
-            m.SetNormals(newNormals);
 
             _UVs = newUVs; //keep ref for painting
             _vertices = newVertices.ToArray();
             _triangles = newTris.ToArray();            
 
-            if (_skinned)
-            {
-                //TODO(maybe later): Use the more complex new SetBoneWeights to support more than 4 bones per vertex
-                m.boneWeights = newBW;                
-            }
+
 
             string s;
             s = "<b>Rebuild, Elapsed:</b> " + (Environment.TickCount - t).ToString() + "ms - ";
@@ -129,7 +139,22 @@ namespace DAPolyPaint
             s += "<b>BuildFaceGraph, Elapsed:</b> " + (Environment.TickCount - t).ToString() + "ms";
             Debug.Log(s);
 
-            
+            //updating mesh with new distribution of vertices
+            m.Clear();
+            if (newVertices.Count > 60000) m.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
+            if (m.subMeshCount > 1) m.subMeshCount = 1; //NOT support for multiple submeshes.
+            m.SetVertices(newVertices);
+            m.SetUVs(_channel, newUVs);
+            m.SetTriangles(newTris, 0);
+            m.SetNormals(newNormals);
+
+            if (_skinned)
+            {
+                //TODO(maybe later): Use the more complex new SetBoneWeights to support more than 4 bones per vertex
+                m.boneWeights = newBW;
+            }
+
+
         }
 
         //After calling RestoreOldMesh, all other painting functions will fail, unless you call RebuildMeshForPainting again.
@@ -141,7 +166,7 @@ namespace DAPolyPaint
 
 
 
-        ///<summary>Defines a new indexed view of the mesh, optimized like it was on 3ds Max source.</summary>
+        ///<summary>Defines a new indexed view of the mesh, optimized like it was on modeling software source.</summary>
         //Needed for geting relationships between faces, edges, verts.
         //_indexedVerts store unique vertices
         //_indexedFaces every 3 values are 3 indexes pointing to _indexedVerts values.
@@ -317,12 +342,23 @@ namespace DAPolyPaint
                     } else
                     {
                         Debug.LogWarning("Backlink not found. Removing link.");
+                        DebugFace(i);
+                        DebugFace(links[j].with);
                         links.RemoveAt(j);
                     }
 
                 }
             }
             Debug.Log("Average Num Links: " + (sum / NumFaces).ToString());
+        }
+
+        void DebugFace(int faceIdx)
+        {
+            Debug.Log("Face: " + faceIdx.ToString());
+            Debug.Log(String.Format("v0: {0}",_indexedFaces[faceIdx]) );
+            Debug.Log(String.Format("v1: {0}",_indexedFaces[faceIdx+1]));
+            Debug.Log(String.Format("v2: {0}",_indexedFaces[faceIdx+2]));
+
         }
 
         public HashSet<int> GetFacesUsingVerts(int[] verts)
