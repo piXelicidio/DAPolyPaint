@@ -77,41 +77,20 @@ namespace DAPolyPaint
             var newTris = new List<int>();
             var newNormals = new List<Vector3>();
             var newBW = new BoneWeight[_oldMesh.tris.Length];
+
             //no more shared vertices, each triangle will have its own 3 vertices.
-
-            for (int i = 0; i < _oldMesh.tris.Length; i += 3)
+            for (int i = 0; i < _oldMesh.tris.Length; i++)
             {
-                var idx1 = _oldMesh.tris[i];
-                var idx2 = _oldMesh.tris[i + 1];
-                var idx3 = _oldMesh.tris[i + 2];
-
-                // If the triangle is invalid, skip the rest of this loop iteration
-                if (_oldMesh.vertices[idx1] == _oldMesh.vertices[idx2] ||
-                    _oldMesh.vertices[idx1] == _oldMesh.vertices[idx3] ||
-                    _oldMesh.vertices[idx2] == _oldMesh.vertices[idx3])
-                {
-                    Debug.LogWarning("Invalid self-overlapping face removed.");
-                    continue;
-                }
-
+                var idx = _oldMesh.tris[i];
                 newTris.Add(i);
-                newTris.Add(i + 1);
-                newTris.Add(i + 2);
-                newVertices.Add(_oldMesh.vertices[idx1]);
-                newVertices.Add(_oldMesh.vertices[idx2]);
-                newVertices.Add(_oldMesh.vertices[idx3]);
-                newNormals.Add(_oldMesh.normals[idx1]);
-                newNormals.Add(_oldMesh.normals[idx2]);
-                newNormals.Add(_oldMesh.normals[idx3]);
-                newUVs.Add(_oldMesh.UVs[_oldMesh.tris[i]]);
-                newUVs.Add(_oldMesh.UVs[_oldMesh.tris[i + 1]]);
-                newUVs.Add(_oldMesh.UVs[_oldMesh.tris[i + 2]]);
+                newVertices.Add(_oldMesh.vertices[idx]);
+                newNormals.Add(_oldMesh.normals[idx]);
+                //also UVs but the 3 values will be the same
+                newUVs.Add(_oldMesh.UVs[_oldMesh.tris[i - i % 3]]);
 
                 if (_skinned)
                 {
-                    newBW[i] = _oldMesh.boneWeights[idx1];
-                    newBW[i + 1] = _oldMesh.boneWeights[idx2];
-                    newBW[i + 2] = _oldMesh.boneWeights[idx3];
+                    newBW[i] = _oldMesh.boneWeights[idx];
                 }
             }
 
@@ -126,7 +105,8 @@ namespace DAPolyPaint
             s = "<b>Rebuild, Elapsed:</b> " + (Environment.TickCount - t).ToString() + "ms - ";
             t = Environment.TickCount;
 
-            Indexify();
+            Indexify_noDic();
+            
             s += "<b>Indexify, Elapsed:</b> " + (Environment.TickCount - t).ToString() + "ms - ";
             t = Environment.TickCount;
 
@@ -207,6 +187,53 @@ namespace DAPolyPaint
 
             //Tested with casual_Female_G model when from 4k verts to originallly 824 verts, just like 3ds Max version.
             Debug.Log(String.Format("NumVerts before:{0} after:{1} dumbSymmetryTest:{2}", NumVerts, sharedVerts.Count, dumbSymmetryTest));
+        }
+
+        //no-Dictionary version of Indexify
+        private void Indexify_noDic()
+        {
+            var sharedVerts = new List<Vector3>();
+            var indexReplace = new int[_triangles.Length];
+            var facesUsingVert = new List<List<int>>();
+            _indexedFaces = new int[_triangles.Length];
+            var dumbSymmetryTest = 0;
+
+            for (int i = 0; i < NumVerts; i++)
+            {
+                var v = _vertices[i];
+                var idx = sharedVerts.FindIndex(x => x == v);
+
+                if (idx == -1)
+                {
+                    idx = sharedVerts.Count;
+                    sharedVerts.Add(v);
+                    var list = new List<int>();
+                    list.Add(i / 3);
+                    facesUsingVert.Add(list);
+                    if (v.x > 0) dumbSymmetryTest++; else if (v.x < 0) dumbSymmetryTest--;
+                }
+                indexReplace[i] = idx;
+                facesUsingVert[idx].Add(i / 3);
+            }
+
+            for (int i = 0; i < _triangles.Length; i++)
+            {
+                _indexedFaces[i] = indexReplace[_triangles[i]];
+            }
+            _indexedVerts = sharedVerts.ToArray();
+            _facesUsingVert = facesUsingVert.ToArray();
+                        
+            Debug.Log(String.Format("NumVerts before:{0} after:{1} dumbSymmetryTest:{2}", NumVerts, sharedVerts.Count, dumbSymmetryTest));
+        }
+
+        private void InvalidFaceRemoval()
+        {
+            for (int i = 0; i < _indexedFaces.Length; i += 3)
+            {
+                var idx0 = _indexedFaces[i];
+                var idx1 = _indexedFaces[i + 1];
+                var idx2 = _indexedFaces[i + 2];
+            }
         }
 
         private void CalcAngles()
