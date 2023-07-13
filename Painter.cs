@@ -105,7 +105,8 @@ namespace DAPolyPaint
             s = "<b>Rebuild, Elapsed:</b> " + (Environment.TickCount - t).ToString() + "ms - ";
             t = Environment.TickCount;
 
-            Indexify_noDic();
+            Indexify();
+            //Indexify_boundBox();
             
             s += "<b>Indexify, Elapsed:</b> " + (Environment.TickCount - t).ToString() + "ms - ";
             t = Environment.TickCount;
@@ -189,7 +190,7 @@ namespace DAPolyPaint
             Debug.Log(String.Format("NumVerts before:{0} after:{1} dumbSymmetryTest:{2}", NumVerts, sharedVerts.Count, dumbSymmetryTest));
         }
 
-        //no-Dictionary version of Indexify
+        //no-Dictionary version of Indexify (200x slower)
         private void Indexify_noDic()
         {
             var sharedVerts = new List<Vector3>();
@@ -223,6 +224,75 @@ namespace DAPolyPaint
             _indexedVerts = sharedVerts.ToArray();
             _facesUsingVert = facesUsingVert.ToArray();
                         
+            Debug.Log(String.Format("NumVerts before:{0} after:{1} dumbSymmetryTest:{2}", NumVerts, sharedVerts.Count, dumbSymmetryTest));
+        }
+
+        //bounding box check version of Indexify 
+        private void Indexify_boundBox()
+        {
+            var sharedVerts = new List<Vector3>();
+            var indexReplace = new int[_triangles.Length];
+            var facesUsingVert = new List<List<int>>();
+            _indexedFaces = new int[_triangles.Length];
+            var dumbSymmetryTest = 0;
+            Vector3 minBox, maxBox;
+            if (NumVerts > 0)
+            {
+                minBox = _vertices[0];
+                maxBox = _vertices[0];
+                sharedVerts.Add(_vertices[0]);
+                var list = new List<int>();
+                facesUsingVert.Add(list);
+                indexReplace[0] = 0;
+                facesUsingVert[0].Add(0);
+            } else return;
+
+            bool boundBoxContains(Vector3 point)
+            {
+                return point.x >= minBox.x && point.y >= minBox.y && point.z >= minBox.z &&
+                       point.x <= maxBox.x && point.y <= maxBox.y && point.z <= maxBox.z ;
+            }
+
+            void boundBoxEncapsulate(Vector3 point)
+            {
+                if (point.x < minBox.x) minBox.x = point.x;
+                if (point.y < minBox.y) minBox.y = point.y;
+                if (point.z < minBox.z) minBox.z = point.z;
+                if (point.x > maxBox.x) maxBox.x = point.x;
+                if (point.y > maxBox.y) maxBox.y = point.y;
+                if (point.z > maxBox.z) maxBox.z = point.z;
+            }
+
+            for (int i = 1; i < NumVerts; i++)
+            {
+                var v = _vertices[i];
+                int idx = -1;
+                if (boundBoxContains(v))
+                {
+                    idx = sharedVerts.FindIndex(x => x == v);                    
+                } 
+
+                if (idx == -1)
+                {
+                    idx = sharedVerts.Count;
+                    sharedVerts.Add(v);
+                    boundBoxEncapsulate(v);
+                    var list = new List<int>();
+                    list.Add(i / 3);
+                    facesUsingVert.Add(list);
+                    if (v.x > 0) dumbSymmetryTest++; else if (v.x < 0) dumbSymmetryTest--;
+                }
+                indexReplace[i] = idx;
+                facesUsingVert[idx].Add(i / 3);
+            }
+
+            for (int i = 0; i < _triangles.Length; i++)
+            {
+                _indexedFaces[i] = indexReplace[_triangles[i]];
+            }
+            _indexedVerts = sharedVerts.ToArray();
+            _facesUsingVert = facesUsingVert.ToArray();
+
             Debug.Log(String.Format("NumVerts before:{0} after:{1} dumbSymmetryTest:{2}", NumVerts, sharedVerts.Count, dumbSymmetryTest));
         }
 
