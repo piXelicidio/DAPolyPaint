@@ -303,15 +303,21 @@ namespace DAPolyPaint
                 AssetDatabase.SaveAssets();
                 AssetDatabase.Refresh();
                 if (reassign)
-                {
+                {                    
                     _targetMesh = AssetDatabase.LoadAssetAtPath<Mesh>(newPath);
                     if (_skinned)
                     {
-                        _targetObject.GetComponent<SkinnedMeshRenderer>().sharedMesh = _targetMesh;
+                        var meshComp = _targetObject.GetComponent<SkinnedMeshRenderer>();
+                        Undo.RecordObject(meshComp, "PolyPaint Mesh");
+                        meshComp.sharedMesh = _targetMesh;
+                        PrefabUtility.RecordPrefabInstancePropertyModifications(meshComp);
                     }
                     else
                     {
-                        _targetObject.GetComponent<MeshFilter>().sharedMesh = _targetMesh;
+                        var meshComp = _targetObject.GetComponent<MeshFilter>();
+                        Undo.RecordObject(meshComp, "PolyPaint Mesh");
+                        meshComp.sharedMesh = _targetMesh;
+                        PrefabUtility.RecordPrefabInstancePropertyModifications(meshComp);
                     }
                 }
                 return true;
