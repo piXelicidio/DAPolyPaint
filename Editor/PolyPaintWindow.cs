@@ -134,6 +134,34 @@ namespace DAPolyPaint
         //Editor Window User Interface - PolyPaint --------------------------------
         void OnGUI()
         {
+            //processing input events when the window is focused
+            var currEvent = Event.current;
+            if (currEvent.isKey)
+            {
+                if (currEvent.control)
+                {
+                    if (currEvent.keyCode == KeyCode.Z)
+                    {
+                        if (currEvent.type == EventType.KeyUp)
+                        {
+                            //Debug.Log("Ctrl+Z pressed on window focused!");                            
+                            _painter.Undo_Undo();
+                        }
+                        currEvent.Use();
+                    }
+                    if (currEvent.keyCode == KeyCode.Y)
+                    {
+                        if (currEvent.type == EventType.KeyUp)
+                        {
+                            //Debug.Log("Ctrl+Y pressed on window focused!");
+                            _painter.Undo_Redo();
+                        }
+                        currEvent.Use();
+                    }
+                }
+            }
+
+            //Big PAINT MODE button
             _scrollPos = EGL.BeginScrollView(_scrollPos);
             using (new EditorGUI.DisabledScope(_targetMesh == null))
             {
