@@ -57,7 +57,9 @@ namespace DAPolyPaint
                 new GUIContent("Loop", "(Ctrl+Shift) Detect and paint face loops"),
                 new GUIContent("Pick", "(Shift) Pick the color from a face")
             };
-        private int _currTool = 0;
+        private int _currToolCode = 0;
+        
+        private int _selectedGrid;
         private bool _anyModifiers = false;
         private int _savedTool;
         private bool _autoSave = false;
@@ -193,7 +195,16 @@ namespace DAPolyPaint
                     if (GUILayout.Button("Full Repaint")) _painter.FullRepaint(_lastUVpick);
                 }
                 EGL.Space();
-                _currTool = GUILayout.Toolbar(_currTool, _toolNames_gc);
+
+                GUILayout.BeginVertical("", EditorStyles.textArea);
+                //TODO: toolbar selected parameter can be set to -1 to unselect all buttons.
+                _currToolCode = GUILayout.Toolbar(_currToolCode, _toolNames_gc);
+                if (_currToolCode == ToolType.fill)
+                {
+                    string[] options = new string[] { "Flood", "Replace", "Element" };
+                    _selectedGrid = GUILayout.SelectionGrid(_selectedGrid, options, 3, EditorStyles.toggleGroup);
+                }
+                GUILayout.EndVertical();
                 _autoQuads = EGL.ToggleLeft("Auto-detect quads", _autoQuads);
                 //EGL.PrefixLabel("Max quad tolerance:");
                 //if (_painter!=null)  _painter.QuadTolerance = EGL.Slider(_painter.QuadTolerance, 0.1f, 360f);
@@ -385,7 +396,7 @@ namespace DAPolyPaint
 
         string GetCurrToolName()
         {
-            var index = _currTool;
+            var index = _currToolCode;
             if (index >= 0 && index < _toolNames.Length)
             {
                 return _toolNames[index];
@@ -396,7 +407,7 @@ namespace DAPolyPaint
         void SetCurrTool(string name)
         {
             var index = Array.IndexOf(_toolNames, name);
-            _currTool = index;
+            _currToolCode = index;
         }
 
         private void OnGUI_TexturePalette()
@@ -886,18 +897,18 @@ namespace DAPolyPaint
                 {
                     _anyModifiers = true;
                     //starting modifiers;
-                    _savedTool = _currTool;
+                    _savedTool = _currToolCode;
                 }
-                if (ev.shift && ev.control) _currTool = 2;
-                else if (ev.control) _currTool = 1;
-                else if (ev.shift) _currTool = 3;
+                if (ev.shift && ev.control) _currToolCode = ToolType.loop;
+                else if (ev.control) _currToolCode = ToolType.fill;
+                else if (ev.shift) _currToolCode = ToolType.pick;
                 Repaint();
             } else
             {
                 if (_anyModifiers)
                 {
                     _anyModifiers = false;
-                    _currTool = _savedTool;
+                    _currToolCode = _savedTool;
                     //ending modifiers;
                     Repaint();
                 }
@@ -1324,5 +1335,13 @@ namespace DAPolyPaint
         //{
         //    //can draw GUI or interactive handles
         //}
+    }
+
+    public class ToolType
+    {
+        public static readonly int brush = 0;
+        public static readonly int fill = 1;
+        public static readonly int loop = 2;
+        public static readonly int pick = 3;
     }
 }
