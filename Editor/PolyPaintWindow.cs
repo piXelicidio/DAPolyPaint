@@ -59,7 +59,8 @@ namespace DAPolyPaint
             };
         private int _currToolCode = 0;
         
-        private int _selectedGrid;
+        private int _fillVariant;
+        private string[] _fillVariantOptions = new string[] { " Flood", " Replace", " Element" };
         private bool _anyModifiers = false;
         private int _savedTool;
         private bool _autoSave = false;
@@ -200,9 +201,8 @@ namespace DAPolyPaint
                 //TODO: toolbar selected parameter can be set to -1 to unselect all buttons.
                 _currToolCode = GUILayout.Toolbar(_currToolCode, _toolNames_gc);
                 if (_currToolCode == ToolType.fill)
-                {
-                    string[] options = new string[] { "Flood", "Replace", "Element" };
-                    _selectedGrid = GUILayout.SelectionGrid(_selectedGrid, options, 3, EditorStyles.toggleGroup);
+                {                    
+                    _fillVariant = GUILayout.SelectionGrid(_fillVariant, _fillVariantOptions, 3, EditorStyles.radioButton);
                 }
                 GUILayout.EndVertical();
                 _autoQuads = EGL.ToggleLeft("Auto-detect quads", _autoQuads);
@@ -752,13 +752,12 @@ namespace DAPolyPaint
         }
 
         private void ProcessSceneEvents(SceneView scene, int id, Event ev)
-        {
-            var tool = GetCurrToolName();
+        {          
             
             //When the mouse is moving while the left click is pressed
             if (ev.type == EventType.MouseDrag)
             {
-                DoMouseDrag(scene, ev, tool);
+                DoMouseDrag(scene, ev, _currToolCode);
             }
             //When the mouse is moving freely around
             else if (ev.type == EventType.MouseMove)
@@ -775,7 +774,7 @@ namespace DAPolyPaint
             {
                 if (ev.button == 0)
                 {
-                    DoMouseDownLeftClick(scene, id, ev, tool);
+                    DoMouseDownLeftClick(scene, id, ev, _currToolCode);
                 }
             }
             //When the mouse click is released
@@ -783,12 +782,12 @@ namespace DAPolyPaint
             {
                 if (ev.button == 0)
                 {
-                    if (tool == "Loop")
+                    if (_currToolCode == ToolType.loop)
                     {
                         PaintUsingCursor();
                         _painter.Undo_SaveState();
                     }
-                    else if (tool == "Brush")
+                    else if (_currToolCode == ToolType.brush)
                     {
                         _painter.Undo_SaveState();
                     }
@@ -822,7 +821,7 @@ namespace DAPolyPaint
             }
         }
 
-        private void DoMouseDownLeftClick(SceneView scene, int id, Event ev, string tool)
+        private void DoMouseDownLeftClick(SceneView scene, int id, Event ev, int tool)
         {
             AcquireInput(ev, id);
             _isPressed = true;
@@ -830,28 +829,39 @@ namespace DAPolyPaint
             {
                 DoFaceHit(scene, ev.mousePosition);
                 BuildCursor();
-                if (tool == "Fill")
+                if (tool == ToolType.fill)
                 {
                     var anyFace = _lastFace >= 0;
                     var anyMirror = (_mirrorCursor && _lastFace_Mirror >= 0);
                     if (anyFace || anyMirror)
                     {
-                        if (anyFace) _painter.FillPaint(_lastFace, _lastUVpick);
-                        if (anyMirror) _painter.FillPaint(_lastFace_Mirror, _lastUVpick);
+                        if (anyFace) DoFillTool(_lastFace, _lastUVpick);
+                        if (anyMirror) DoFillTool(_lastFace_Mirror, _lastUVpick);
                         _painter.Undo_SaveState();
                     }
                 }
-                else if (tool == "Pick")
+                else if (tool == ToolType.pick)
                 {
                     PickFromSurface(_lastFace);
                 }
-                else if (tool == "Loop") { }
+                else if (tool == ToolType.loop) { }
                 else PaintUsingCursor();
                 Repaint();
             }
         }
 
-        private void DoMouseDrag(SceneView scene, Event ev, string tool)
+        private void DoFillTool(int face, Vector2 UV)
+        {
+            if (_fillVariant == FillVariant.replace)
+            {
+                _painter.FillReplace(face, UV);
+            } else if (_fillVariant == FillVariant.element)
+            {
+                _painter.FillElement(face, UV);
+            } else  _painter.FillPaint(face, UV);
+        }
+
+        private void DoMouseDrag(SceneView scene, Event ev, int tool)
         {
             DoFaceHit(scene, ev.mousePosition);
             if (_lastFace != _prevFace)
@@ -859,7 +869,7 @@ namespace DAPolyPaint
                 BuildCursor();
                 if (_isPressed)
                 {
-                    if (tool == "Loop")
+                    if (tool == ToolType.loop)
                     {
                         Debug.Log(String.Format("Ctrl+drag: From {0} to {1}", _prevFace, _lastFace));
                         BuildLoopCursor(_prevFace, _lastFace, true);
@@ -867,11 +877,11 @@ namespace DAPolyPaint
                         //scene.Repaint();
                         //PaintUsingCursor();
                     }
-                    else if (tool == "Pick")
+                    else if (tool == ToolType.pick)
                     {
                         PickFromSurface(_lastFace);
                     }
-                    else if (tool == "Brush") PaintUsingCursor();
+                    else if (tool == ToolType.brush) PaintUsingCursor();
                 }
             }
             scene.Repaint();
@@ -1343,5 +1353,12 @@ namespace DAPolyPaint
         public static readonly int fill = 1;
         public static readonly int loop = 2;
         public static readonly int pick = 3;
+    }
+
+    public class FillVariant
+    {
+        public static readonly int flood = 0;
+        public static readonly int replace = 1;
+        public static readonly int element = 2;
     }
 }

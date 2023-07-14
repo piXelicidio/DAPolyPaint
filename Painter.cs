@@ -517,14 +517,14 @@ namespace DAPolyPaint
         }
 
 
-        public void SetUV(int face, Vector2 uvc)
+        public void SetUV(int face, Vector2 uvc, bool update = true)
         {
             if (face >= 0)
             {
                 _UVs[face * 3] = uvc;
                 _UVs[face * 3 + 1] = uvc;
                 _UVs[face * 3 + 2] = uvc;
-                _targetMesh.SetUVs(_channel, _UVs);  //could be improved if Start, Length parameters actually worked                
+                if (update) _targetMesh.SetUVs(_channel, _UVs);  //could be improved if Start, Length parameters actually worked                
                 NumUVCalls++;
             }
         }
@@ -559,7 +559,7 @@ namespace DAPolyPaint
         }
 
 
-        public void FillPaint(int startFace, Vector2 uvc)
+        public void FillPaint(int startFace, Vector2 uvc, bool DontCheckColor = false)
         {            
             var bk_pixelColor = GetTextureColor(GetUV(startFace));
             var border = new HashSet<int>();
@@ -583,17 +583,26 @@ namespace DAPolyPaint
                 _targetMesh.SetUVs(_channel, _UVs);  //can be called at the end just once
                 //find neighbors
                 neighbors.Clear();
-                var noSpread = 0;
+                
                 foreach (int face in border)
                 {
                     var faceLinks = GetFaceLinks(face);
                     foreach (var link in faceLinks)
                     {
-                        if (GetTextureColor(_UVs[link.with*3]) == bk_pixelColor && !visited[link.with])
+                        if (DontCheckColor)
                         {
-                            neighbors.Add(link.with);                            
+                            if (!visited[link.with])
+                            {
+                                neighbors.Add(link.with);
+                            }
                         }
-                        else noSpread++;
+                        else
+                        {
+                            if (GetTextureColor(_UVs[link.with * 3]) == bk_pixelColor && !visited[link.with])
+                            {
+                                neighbors.Add(link.with);
+                            }
+                        }
                     }
                 }
                 //swap                
@@ -745,7 +754,27 @@ namespace DAPolyPaint
             return _undoPos > 0;
         }
 
+        public void FillReplace(int face, Vector2 UV)
+        {
+            Debug.Log("Replacing...");
+            if (face > 0 && face < NumFaces)
+            {
+                var pick = GetTextureColor(GetUV(face));
+                for (int i = 0; i < NumFaces; i++)
+                {
+                    if (GetTextureColor(GetUV(i)) == pick)
+                    {
+                        SetUV(i, UV, false);
+                    }
+                }
+                _targetMesh.SetUVs(_channel, _UVs);
+            }            
+        }
 
+        public void FillElement(int face, Vector2 UV)
+        {
+            FillPaint(face, UV, true);
+        }
     }
 
     public class MeshCopy
