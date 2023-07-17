@@ -19,8 +19,9 @@ namespace DAPolyPaint
     {
         Painter _painter;
 
+        private const string _toolName = "DAPolyPaint";
         bool _paintingMode;
-        bool _objectInfo = true;
+        bool _objectInfoFoldout = true;
         bool _isPressed = false;
 
         GameObject _targetObject;
@@ -83,15 +84,42 @@ namespace DAPolyPaint
 
         public void CreateGUI()
         {     
-            if (_painter==null) _painter = new Painter();
-            SceneView.duringSceneGui += OnSceneGUI;
+            if (_painter==null) _painter = new Painter();            
             this.OnSelectionChange();
         }
 
+        private void OnEnable()
+        {
+            SceneView.duringSceneGui += OnSceneGUI;
+            _objectInfoFoldout = EditorPrefs.GetBool(_toolName+"_objectInfoFoldout", true);
+            _lastUVpick.x = EditorPrefs.GetFloat(_toolName + "_lastUVpick.x", 0.5f);
+            _lastUVpick.y = EditorPrefs.GetFloat(_toolName + "_lastUVpick.y", 0.5f);
+            _currToolCode = EditorPrefs.GetInt(_toolName + "_currToolCode", 0);
+            _fillVariant = EditorPrefs.GetInt(_toolName + "_fillVariant", 0);
+            _autoQuads = EditorPrefs.GetBool(_toolName + "_autoQuads", true);
+            _currMirrorAxis = EditorPrefs.GetInt(_toolName + "_mirrorAxis", 0);
+            _axisOffset = EditorPrefs.GetFloat(_toolName + "_axisOffset", 0);
+            PaintEditor.ShowMirrorPlane = EditorPrefs.GetBool(_toolName + "ShowMirrorPlane", true);          
+        }
+
+        private void OnDisable()
+        {
+            SceneView.duringSceneGui -= OnSceneGUI;
+            EditorPrefs.SetBool(_toolName + "_objectInfoFoldout", _objectInfoFoldout);
+            EditorPrefs.SetFloat(_toolName + "_lastUVpick.x", _lastUVpick.x);
+            EditorPrefs.SetFloat(_toolName + "_lastUVpick.y", _lastUVpick.y);
+            EditorPrefs.SetInt(_toolName + "_currToolCode", _currToolCode);
+            EditorPrefs.SetInt(_toolName + "_fillVariant", _fillVariant);
+            EditorPrefs.SetBool(_toolName + "_autoQuads", _autoQuads);
+            EditorPrefs.SetInt(_toolName + "_mirrorAxis", _currMirrorAxis);
+            EditorPrefs.SetFloat(_toolName + "_axisOffset", _axisOffset);
+            EditorPrefs.SetBool(_toolName + "ShowMirrorPlane", PaintEditor.ShowMirrorPlane);
+        }
+    
+
         public void OnDestroy()
         {
-            if (_paintingMode) StopPaintMode();
-            SceneView.duringSceneGui -= OnSceneGUI;            
+            if (_paintingMode) StopPaintMode();           
         }
         
         void StartPaintMode()
@@ -470,10 +498,15 @@ namespace DAPolyPaint
             }
             EditorGUI.DrawRect(statusColorRect, statusColor);
             var s = "";
-            if (_targetObject == null) s = "Object: None selected"; else s = _targetObject.name;
+            if (_targetObject == null) s = "Object: None selected";
+            else
+            {
+                s = _targetObject.name;
+                if (!check.isOk) s += ": Issues...";
+            }
 
-            _objectInfo = EGL.BeginFoldoutHeaderGroup(_objectInfo, s);
-            if (_objectInfo)
+            _objectInfoFoldout = EGL.BeginFoldoutHeaderGroup(_objectInfoFoldout, s);
+            if (_objectInfoFoldout)
             {
                 if (check.isOk)
                 {
