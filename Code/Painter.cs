@@ -678,7 +678,7 @@ namespace DAPolyPaint
                             break;
                         };
                     }
-                    if (jumpToFace == -1) Debug.LogWarning("No opposite side found!");
+                    //if (jumpToFace == -1) Debug.LogWarning("No opposite side found!");
                     f1 = f2_quadBro;
                     f2 = jumpToFace;
                     noOverlaps = result.Add(f1) && result.Add(f2);

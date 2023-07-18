@@ -213,13 +213,20 @@ namespace DAPolyPaint
 
             GUILayout.BeginVertical("", EditorStyles.textArea);
             //TODO: toolbar selected parameter can be set to -1 to unselect all buttons.
-            _currToolCode = GUILayout.Toolbar(_currToolCode, _toolNames_gc);
+            //TOOLBAR of: Brush, Fill, Loop, Pick
+            _currToolCode = GUILayout.Toolbar(_currToolCode, _toolNames);
             if (_currToolCode == ToolType.fill)
             {
                 _fillVariant = GUILayout.SelectionGrid(_fillVariant, _fillVariantOptions, 3, EditorStyles.radioButton);
+            } else if (_currToolCode == ToolType.brush)
+            {
+                _autoQuads = EGL.ToggleLeft("Auto-detect quads", _autoQuads);
+            } else
+            {
+                EGL.Space();
             }
             GUILayout.EndVertical();
-            _autoQuads = EGL.ToggleLeft("Auto-detect quads", _autoQuads);
+            
             //EGL.PrefixLabel("Max quad tolerance:");
             //if (_painter!=null)  _painter.QuadTolerance = EGL.Slider(_painter.QuadTolerance, 0.1f, 360f);
             _mirrorCursor = EGL.ToggleLeft(new GUIContent("Mirror Cursor. Axis:", ""), _mirrorCursor);
@@ -1080,7 +1087,7 @@ namespace DAPolyPaint
             if (_lastFace >= 0)
             {                
                 PaintEditor.PolyCursor.Add(CreatePoly(_lastFace));
-                if (_autoQuads)
+                if (_autoQuads && (_currToolCode == ToolType.brush || _currToolCode == ToolType.loop))
                 {
                     var quadBro = _painter.FindQuad(_lastFace);
                     if (quadBro != -1)
@@ -1092,7 +1099,7 @@ namespace DAPolyPaint
             if (_mirrorCursor&&(_lastFace_Mirror >= 0 ))
             {
                 PaintEditor.PolyCursor.Add(CreatePoly(_lastFace_Mirror));
-                if (_autoQuads)
+                if (_autoQuads && (_currToolCode == ToolType.brush || _currToolCode == ToolType.loop))
                 {
                     var quadBro = _painter.FindQuad(_lastFace_Mirror);
                     if (quadBro != -1)
