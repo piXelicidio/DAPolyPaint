@@ -662,7 +662,7 @@ namespace DAPolyPaint
                 result.Add(f2);
                 bool noOverlaps = true;
                 //Debug.Log("Let's find the loop!");
-                var breakLimit = 20;
+                var breakLimit = 1000; //TODO: arbitrary temporal safe limit, should go away with better solution
                 do
                 {
                     

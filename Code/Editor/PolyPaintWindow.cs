@@ -46,6 +46,7 @@ namespace DAPolyPaint
         private Vector2 _scrollPos;
         private MeshCollider _meshCollider;
         private bool _autoQuads = true;
+        private bool _loopTwoWays = true;
         private bool _mirrorCursor = false;
         private int _currMirrorAxis;
         private float _axisOffset;
@@ -99,7 +100,8 @@ namespace DAPolyPaint
             _autoQuads = EditorPrefs.GetBool(_toolName + "_autoQuads", true);
             _currMirrorAxis = EditorPrefs.GetInt(_toolName + "_mirrorAxis", 0);
             _axisOffset = EditorPrefs.GetFloat(_toolName + "_axisOffset", 0);
-            PaintEditor.ShowMirrorPlane = EditorPrefs.GetBool(_toolName + "ShowMirrorPlane", true);          
+            PaintEditor.ShowMirrorPlane = EditorPrefs.GetBool(_toolName + "ShowMirrorPlane", true);
+            _loopTwoWays = EditorPrefs.GetBool(_toolName + "_loopTwoWays", true);
         }
 
         private void OnDisable()
@@ -114,6 +116,7 @@ namespace DAPolyPaint
             EditorPrefs.SetInt(_toolName + "_mirrorAxis", _currMirrorAxis);
             EditorPrefs.SetFloat(_toolName + "_axisOffset", _axisOffset);
             EditorPrefs.SetBool(_toolName + "ShowMirrorPlane", PaintEditor.ShowMirrorPlane);
+            EditorPrefs.SetBool(_toolName + "_loopTwoWays", _loopTwoWays);
         }
     
 
@@ -218,9 +221,14 @@ namespace DAPolyPaint
             if (_currToolCode == ToolType.fill)
             {
                 _fillVariant = GUILayout.SelectionGrid(_fillVariant, _fillVariantOptions, 3, EditorStyles.radioButton);
-            } else if (_currToolCode == ToolType.brush)
+            } 
+            else if (_currToolCode == ToolType.brush)
             {
                 _autoQuads = EGL.ToggleLeft("Auto-detect quads", _autoQuads);
+            }
+            else if (_currToolCode == ToolType.loop)
+            {
+                _loopTwoWays = EGL.ToggleLeft("Two Ways", _loopTwoWays);
             } else
             {
                 EGL.Space();
@@ -1018,8 +1026,11 @@ namespace DAPolyPaint
         private void BuildLoopCursor(int fromFace, int toFace, bool clearPolyCursor)
         {
             var loop = _painter.FindLoop(fromFace, toFace);
-            var loopBack = _painter.FindLoop(toFace, fromFace);
-            loop.UnionWith(loopBack);
+            if (_loopTwoWays)
+            {
+                var loopBack = _painter.FindLoop(toFace, fromFace);
+                loop.UnionWith(loopBack);
+            }
 
             if (clearPolyCursor) PaintEditor.PolyCursor.Clear();
 
@@ -1030,6 +1041,7 @@ namespace DAPolyPaint
                 poly.FaceNum = f;
                 PaintEditor.PolyCursor.Add(poly);
             }
+            Debug.Log("num faces in loop: " + loop.Count.ToString());
 
         }
 
