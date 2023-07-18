@@ -187,7 +187,7 @@ namespace DAPolyPaint
             _facesUsingVert = facesUsingVert.ToArray();
 
             //Tested with casual_Female_G model when from 4k verts to originallly 824 verts, just like 3ds Max version.
-            Debug.Log(String.Format("NumVerts before:{0} after:{1} dumbSymmetryTest:{2}", NumVerts, sharedVerts.Count, dumbSymmetryTest));
+            //Debug.Log(String.Format("NumVerts before:{0} after:{1} dumbSymmetryTest:{2}", NumVerts, sharedVerts.Count, dumbSymmetryTest));
         }
 
         //no-Dictionary version of Indexify (200x slower)
@@ -224,7 +224,7 @@ namespace DAPolyPaint
             _indexedVerts = sharedVerts.ToArray();
             _facesUsingVert = facesUsingVert.ToArray();
                         
-            Debug.Log(String.Format("NumVerts before:{0} after:{1} dumbSymmetryTest:{2}", NumVerts, sharedVerts.Count, dumbSymmetryTest));
+            //Debug.Log(String.Format("NumVerts before:{0} after:{1} dumbSymmetryTest:{2}", NumVerts, sharedVerts.Count, dumbSymmetryTest));
         }
 
         //bounding box check version of Indexify 
@@ -293,7 +293,7 @@ namespace DAPolyPaint
             _indexedVerts = sharedVerts.ToArray();
             _facesUsingVert = facesUsingVert.ToArray();
 
-            Debug.Log(String.Format("NumVerts before:{0} after:{1} dumbSymmetryTest:{2}", NumVerts, sharedVerts.Count, dumbSymmetryTest));
+            //Debug.Log(String.Format("NumVerts before:{0} after:{1} dumbSymmetryTest:{2}", NumVerts, sharedVerts.Count, dumbSymmetryTest));
         }
 
         private void InvalidFaceRemoval()
@@ -438,7 +438,7 @@ namespace DAPolyPaint
                         backlink.backLinkIdx = j;
                     } else
                     {
-                        Debug.LogWarning("Backlink not found. Removing link.");
+                        //Debug.LogWarning("Backlink not found. Removing link.");
                         DebugFace(i);
                         DebugFace(links[j].with);
                         links.RemoveAt(j);
@@ -446,7 +446,7 @@ namespace DAPolyPaint
 
                 }
             }
-            Debug.Log("Average Num Links: " + (sum / NumFaces).ToString());
+            //Debug.Log("Average Num Links: " + (sum / NumFaces).ToString());
         }
 
         void DebugFace(int faceIdx)
@@ -610,7 +610,7 @@ namespace DAPolyPaint
 
                 iters++;
             } while (border.Count > 0 && iters<1000);  //TODO: Improve this arbitrary limit
-            Debug.Log(String.Format("Iters:{0} Elapsed:{1}ms", iters, Environment.TickCount - t));
+            //Debug.Log(String.Format("Iters:{0} Elapsed:{1}ms", iters, Environment.TickCount - t));
         }
 
         public Color GetTextureColor(Vector2 uv)
@@ -756,7 +756,7 @@ namespace DAPolyPaint
 
         public void FillReplace(int face, Vector2 UV)
         {
-            Debug.Log("Replacing...");
+            //Debug.Log("Replacing...");
             if (face > 0 && face < NumFaces)
             {
                 var pick = GetTextureColor(GetUV(face));

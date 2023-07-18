@@ -166,31 +166,7 @@ namespace DAPolyPaint
         void OnGUI()
         {
             //processing input events when the window is focused
-            var currEvent = Event.current;
-            if (currEvent.isKey)
-            {
-                if (currEvent.control)
-                {
-                    if (currEvent.keyCode == KeyCode.Z)
-                    {
-                        if (currEvent.type == EventType.KeyUp)
-                        {
-                            //Debug.Log("Ctrl+Z pressed on window focused!");                            
-                            _painter.Undo_Undo();
-                        }
-                        currEvent.Use();
-                    }
-                    if (currEvent.keyCode == KeyCode.Y)
-                    {
-                        if (currEvent.type == EventType.KeyUp)
-                        {
-                            //Debug.Log("Ctrl+Y pressed on window focused!");
-                            _painter.Undo_Redo();
-                        }
-                        currEvent.Use();
-                    }
-                }
-            }
+            OnGUI_InputEvents();
 
             //Big PAINT MODE button
             _scrollPos = EGL.BeginScrollView(_scrollPos);
@@ -218,42 +194,76 @@ namespace DAPolyPaint
             //Painting tools
             using (new EditorGUI.DisabledScope(!_paintingMode))
             {
-                EGL.Space();
-                if (_painter != null)
-                {
-                    if (GUILayout.Button("Full Repaint")) _painter.FullRepaint(_lastUVpick);
-                }
-                EGL.Space();
-
-                GUILayout.BeginVertical("", EditorStyles.textArea);
-                //TODO: toolbar selected parameter can be set to -1 to unselect all buttons.
-                _currToolCode = GUILayout.Toolbar(_currToolCode, _toolNames_gc);
-                if (_currToolCode == ToolType.fill)
-                {                    
-                    _fillVariant = GUILayout.SelectionGrid(_fillVariant, _fillVariantOptions, 3, EditorStyles.radioButton);
-                }
-                GUILayout.EndVertical();
-                _autoQuads = EGL.ToggleLeft("Auto-detect quads", _autoQuads);
-                //EGL.PrefixLabel("Max quad tolerance:");
-                //if (_painter!=null)  _painter.QuadTolerance = EGL.Slider(_painter.QuadTolerance, 0.1f, 360f);
-                _mirrorCursor = EGL.ToggleLeft(new GUIContent("Mirror Cursor. Axis:", ""), _mirrorCursor);
-                PaintEditor.MirrorMode = _mirrorCursor;
-                using (new EditorGUI.DisabledScope(!_mirrorCursor))
-                {
-                    _currMirrorAxis = GUILayout.Toolbar(_currMirrorAxis, _mirrorAxis);
-                    _axisOffset = EGL.FloatField("Axis Offset:", _axisOffset);
-                    PaintEditor.ShowMirrorPlane = EGL.ToggleLeft("Show Mirror Plane", PaintEditor.ShowMirrorPlane);
-                    PaintEditor.MirrorAxis = _currMirrorAxis;
-                    PaintEditor.AxisOffset = _axisOffset;
-                    if (PaintEditor.ShowMirrorPlane) SceneView.lastActiveSceneView.Repaint();
-                }
+                OnGUI_PaintingTools();
                 OnGUI_SavePaintedMesh();
             }
 
             EGL.EndScrollView();
 
         }
-        
+
+        private void OnGUI_PaintingTools()
+        {
+            EGL.Space();
+            if (_painter != null)
+            {
+                if (GUILayout.Button("Full Repaint")) _painter.FullRepaint(_lastUVpick);
+            }
+            EGL.Space();
+
+            GUILayout.BeginVertical("", EditorStyles.textArea);
+            //TODO: toolbar selected parameter can be set to -1 to unselect all buttons.
+            _currToolCode = GUILayout.Toolbar(_currToolCode, _toolNames_gc);
+            if (_currToolCode == ToolType.fill)
+            {
+                _fillVariant = GUILayout.SelectionGrid(_fillVariant, _fillVariantOptions, 3, EditorStyles.radioButton);
+            }
+            GUILayout.EndVertical();
+            _autoQuads = EGL.ToggleLeft("Auto-detect quads", _autoQuads);
+            //EGL.PrefixLabel("Max quad tolerance:");
+            //if (_painter!=null)  _painter.QuadTolerance = EGL.Slider(_painter.QuadTolerance, 0.1f, 360f);
+            _mirrorCursor = EGL.ToggleLeft(new GUIContent("Mirror Cursor. Axis:", ""), _mirrorCursor);
+            PaintEditor.MirrorMode = _mirrorCursor;
+            using (new EditorGUI.DisabledScope(!_mirrorCursor))
+            {
+                _currMirrorAxis = GUILayout.Toolbar(_currMirrorAxis, _mirrorAxis);
+                _axisOffset = EGL.FloatField("Axis Offset:", _axisOffset);
+                PaintEditor.ShowMirrorPlane = EGL.ToggleLeft("Show Mirror Plane", PaintEditor.ShowMirrorPlane);
+                PaintEditor.MirrorAxis = _currMirrorAxis;
+                PaintEditor.AxisOffset = _axisOffset;
+                if (PaintEditor.ShowMirrorPlane) SceneView.lastActiveSceneView.Repaint();
+            }
+        }
+
+        private void OnGUI_InputEvents()
+        {
+            var currEvent = Event.current;
+            if (currEvent.isKey)
+            {
+                if (currEvent.control)
+                {
+                    if (currEvent.keyCode == KeyCode.Z)
+                    {
+                        if (currEvent.type == EventType.KeyUp)
+                        {
+                            //Debug.Log("Ctrl+Z pressed on window focused!");                            
+                            _painter.Undo_Undo();
+                        }
+                        currEvent.Use();
+                    }
+                    if (currEvent.keyCode == KeyCode.Y)
+                    {
+                        if (currEvent.type == EventType.KeyUp)
+                        {
+                            //Debug.Log("Ctrl+Y pressed on window focused!");
+                            _painter.Undo_Redo();
+                        }
+                        currEvent.Use();
+                    }
+                }
+            }
+        }
+
         //GUI section about saving the changes
         void OnGUI_SavePaintedMesh()
         {
@@ -299,7 +309,7 @@ namespace DAPolyPaint
             }
 
             Debug.Log(assetPath);
-            Debug.Log(assetFolderPath);
+            //Debug.Log(assetFolderPath);
             if (string.IsNullOrEmpty(assetPath))
             {
                 Debug.Log("No asset path found for mesh");
@@ -357,8 +367,8 @@ namespace DAPolyPaint
                         }
                         newPath = Path.Combine(newPath, newFileName + "_pnt.asset");
                     }
-                    Debug.Log(newPath);
-                    Debug.Log(IsWithinAssets(newPath) ? "Within Assets" : "Not inside Assets");
+                    //Debug.Log(newPath);
+                    //Debug.Log(IsWithinAssets(newPath) ? "Within Assets" : "Not inside Assets");
                     newPath = AssetDatabase.GenerateUniqueAssetPath(newPath);
                     var mesh = Instantiate(_targetMesh) as Mesh;
                     AssetDatabase.CreateAsset(mesh, newPath);                    
@@ -414,9 +424,9 @@ namespace DAPolyPaint
                 AssetDatabase.CreateAsset(meshToSave, filePath);
                 AssetDatabase.SaveAssets();
                 AssetDatabase.Refresh();
-                Debug.Log("to: " + filePath);
+                //Debug.Log("to: " + filePath);
                 Type assetType = AssetDatabase.GetMainAssetTypeAtPath(filePath);
-                Debug.Log("Type: " + assetType);
+                //Debug.Log("Type: " + assetType);
                 return (AssetDatabase.LoadAssetAtPath<Mesh>(filePath));
             }
             return null;
@@ -904,7 +914,7 @@ namespace DAPolyPaint
                 {
                     if (tool == ToolType.loop)
                     {
-                        Debug.Log(String.Format("Ctrl+drag: From {0} to {1}", _prevFace, _lastFace));
+                        //Debug.Log(String.Format("Ctrl+drag: From {0} to {1}", _prevFace, _lastFace));
                         BuildLoopCursor(_prevFace, _lastFace, true);
                         if (_mirrorCursor) BuildLoopCursor(_prevFace_Mirror, _lastFace_Mirror, false);
                         //scene.Repaint();
@@ -1254,6 +1264,15 @@ namespace DAPolyPaint
         public Vector3 direction;
         public Vector3 origin;
         public bool enabled;
+    }
+
+    /// <summary>
+    /// This will actually added to a dummy object, not the object being edited. Improve names.
+    /// </summary>
+    [HideInInspector]
+    public class PaintCursor : MonoBehaviour
+    {
+        public Mesh TargetMesh;
     }
 
     /// <summary>
