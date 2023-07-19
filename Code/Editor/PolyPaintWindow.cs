@@ -52,17 +52,17 @@ namespace DAPolyPaint
         private float _axisOffset;
         private readonly string[] _toolNames = new string[] { "Brush", "Fill", "Loop", "Pick" };
         private readonly string[] _mirrorAxis = new string[] { "X", "Y", "Z" };
-        private GUIContent[] _toolNames_gc = new GUIContent[] 
-            {
-                new GUIContent("Bursh", "Paint Faces"),  
-                new GUIContent("Fill", "(Ctrl) Fill Continuous faces of same color"),
-                new GUIContent("Loop", "(Ctrl+Shift) Detect and paint face loops"),
-                new GUIContent("Pick", "(Shift) Pick the color from a face")
-            };
+        private readonly string[] _toolHints = new string[]
+        {
+            "Click or Drag over faces", //brush
+            "Click a starting face", //fill
+            "Drag over a quad edge", //loop
+            "Click a face to get color" //pick
+        };
         private int _currToolCode = 0;
         
         private int _fillVariant;
-        private string[] _fillVariantOptions = new string[] { " Flood", " Replace", " Element" };
+        private readonly string[] _fillVariantOptions = new string[] { " Flood", " Replace", " Element" };
         private bool _anyModifiers = false;
         private int _savedTool;
         private bool _autoSave = false;
@@ -92,6 +92,9 @@ namespace DAPolyPaint
         private void OnEnable()
         {
             SceneView.duringSceneGui += OnSceneGUI;
+            AssemblyReloadEvents.beforeAssemblyReload += OnBeforeAssemblyReload;
+            AssemblyReloadEvents.afterAssemblyReload += OnAfterAssemblyReload;
+
             _objectInfoFoldout = EditorPrefs.GetBool(_toolName+"_objectInfoFoldout", true);
             _lastUVpick.x = EditorPrefs.GetFloat(_toolName + "_lastUVpick.x", 0.5f);
             _lastUVpick.y = EditorPrefs.GetFloat(_toolName + "_lastUVpick.y", 0.5f);
@@ -107,6 +110,9 @@ namespace DAPolyPaint
         private void OnDisable()
         {
             SceneView.duringSceneGui -= OnSceneGUI;
+            AssemblyReloadEvents.beforeAssemblyReload -= OnBeforeAssemblyReload;
+            AssemblyReloadEvents.afterAssemblyReload -= OnAfterAssemblyReload;
+
             EditorPrefs.SetBool(_toolName + "_objectInfoFoldout", _objectInfoFoldout);
             EditorPrefs.SetFloat(_toolName + "_lastUVpick.x", _lastUVpick.x);
             EditorPrefs.SetFloat(_toolName + "_lastUVpick.y", _lastUVpick.y);
@@ -118,7 +124,18 @@ namespace DAPolyPaint
             EditorPrefs.SetBool(_toolName + "ShowMirrorPlane", PaintEditor.ShowMirrorPlane);
             EditorPrefs.SetBool(_toolName + "_loopTwoWays", _loopTwoWays);
         }
-    
+
+        public void OnBeforeAssemblyReload()
+        {
+            Debug.Log("Assembly Reloading...");
+            AbortPaintMode();
+        }
+
+        public void OnAfterAssemblyReload()
+        {
+            Debug.Log("Assembly Reloaded.");
+        }
+
 
         public void OnDestroy()
         {
@@ -165,6 +182,15 @@ namespace DAPolyPaint
             //DestroyImmediate(_dummyObject);
         }
 
+        void AbortPaintMode()
+        {
+            //_painter.RestoreOldMesh();
+            _paintingMode = false;
+            SceneView.lastActiveSceneView.Repaint();
+            PaintEditor.PaintMode = false;
+            _paintCursor.enabled = false;
+        }
+
         //Editor Window User Interface - PolyPaint --------------------------------
         void OnGUI()
         {
@@ -177,17 +203,20 @@ namespace DAPolyPaint
             {
                 if (!_paintingMode)
                 {
-                    if (GUILayout.Button("START PAINT MODE"))
+                    if (GUILayout.Button("START PAINTING"))
                     {
                         StartPaintMode();
                     }
                 }
                 else
                 {
-                    if (GUILayout.Button("STOP PAINT MODE"))
+                    var oldColor = GUI.backgroundColor;
+                    GUI.backgroundColor = ColorStatusPainting;
+                    if (GUILayout.Button("END SESSION"))
                     {
                         StopPaintMode();
                     }
+                    GUI.backgroundColor = oldColor;
                 }
             }
 
@@ -214,10 +243,14 @@ namespace DAPolyPaint
             }
             EGL.Space();
 
-            GUILayout.BeginVertical("", EditorStyles.textArea);
+            GUILayout.BeginVertical(EditorStyles.textArea);
             //TODO: toolbar selected parameter can be set to -1 to unselect all buttons.
             //TOOLBAR of: Brush, Fill, Loop, Pick
             _currToolCode = GUILayout.Toolbar(_currToolCode, _toolNames);
+            if (_currToolCode >= 0 && _currToolCode <= _toolNames.Length)
+            {
+                EGL.LabelField(_toolHints[_currToolCode], EditorStyles.miniLabel);
+            }
             if (_currToolCode == ToolType.fill)
             {
                 _fillVariant = GUILayout.SelectionGrid(_fillVariant, _fillVariantOptions, 3, EditorStyles.radioButton);
@@ -233,7 +266,7 @@ namespace DAPolyPaint
             {
                 EGL.Space();
             }
-            GUILayout.EndVertical();
+            
             
             //EGL.PrefixLabel("Max quad tolerance:");
             //if (_painter!=null)  _painter.QuadTolerance = EGL.Slider(_painter.QuadTolerance, 0.1f, 360f);
@@ -248,6 +281,7 @@ namespace DAPolyPaint
                 PaintEditor.AxisOffset = _axisOffset;
                 if (PaintEditor.ShowMirrorPlane) SceneView.lastActiveSceneView.Repaint();
             }
+            GUILayout.EndVertical();
         }
 
         private void OnGUI_InputEvents()
