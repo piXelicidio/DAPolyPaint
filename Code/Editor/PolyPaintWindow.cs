@@ -317,13 +317,20 @@ namespace DAPolyPaint
         void OnGUI_SavePaintedMesh()
         {
             //saving mesh test
-            _autoSave = EGL.ToggleLeft("Auto-save", _autoSave);
+            EGL.Space();
+            _autoSave = EGL.ToggleLeft("Auto-save at the end of the session", _autoSave);
             using (new EditorGUI.DisabledScope(_autoSave))
-            {
-                EGL.Space();
-                if (GUILayout.Button(new GUIContent("Save Changes", "Save the modified painted mesh")))
+            {                
+                if (GUILayout.Button(new GUIContent("Save", "Save the modified painted mesh")))
                 {
-                    if (SaveMeshAsset())
+                    if (SaveMeshAsset(false, false))
+                    {
+                        _painter.Undo_Reset();
+                    };
+                }
+                if (GUILayout.Button(new GUIContent("Save As...", "Save the modified painted mesh")))
+                {
+                    if (SaveMeshAsset(false, true))
                     {
                         _painter.Undo_Reset();
                     };
@@ -348,7 +355,7 @@ namespace DAPolyPaint
 
 
         //Try to apply the changes to the mesh, return false if the process is aborted.
-        public bool SaveMeshAsset(bool optimizeMesh = false)
+        public bool SaveMeshAsset(bool optimizeMesh = false, bool forceNewFileName = false)
         {
             var assetPath = AssetDatabase.GetAssetPath(_targetMesh);
             var assetFolderPath = Path.GetFileName(Application.dataPath);
@@ -376,14 +383,15 @@ namespace DAPolyPaint
                 //if not a separated asset already, save as new asset
                 var reassign = false;
                 string newPath = "";
-                if (format != ".asset")
+                string newFileName = "";
+                if (format != ".asset" || forceNewFileName)
                 {
-                    var meshCompName = (_skinned) ? "SkinnedMeshRenderer" : "MeshFilter";
+                    /* var meshCompName = (_skinned) ? "SkinnedMeshRenderer" : "MeshFilter";
 
                     // Somtimes the format is ""
                     string nonEmptyMsgPrefix = $@"Since the original asset is a {format} the mesh will be saved as a new asset,";
                     string emptyMsgPrefix = "The mesh will be saved as a new asset,";
-
+                    
                     var userOk = EditorUtility.DisplayDialog("Saving modified mesh...",
                                          $@"{(format == "" ? emptyMsgPrefix : nonEmptyMsgPrefix)} and the {meshCompName} reference updated.",
                                          "OK", "Cancel");
@@ -420,7 +428,32 @@ namespace DAPolyPaint
                     //Debug.Log(IsWithinAssets(newPath) ? "Within Assets" : "Not inside Assets");
                     newPath = AssetDatabase.GenerateUniqueAssetPath(newPath);
                     var mesh = Instantiate(_targetMesh) as Mesh;
-                    AssetDatabase.CreateAsset(mesh, newPath);                    
+                    AssetDatabase.CreateAsset(mesh, newPath);  
+                   */
+                    
+                    if (!IsWithinAssets(assetPath))
+                    {
+                        newPath = assetFolderPath;
+                    }
+                    newFileName = Path.GetFileNameWithoutExtension(assetPath);
+                    if (format != "")
+                    {
+                        newPath = Path.Combine(newPath, newFileName + "_pnt.asset");
+                    }
+                    else
+                    {
+
+                        if (newFileName == "unity default resources")
+                        {
+                            newFileName = ConvertToValidFileName(_targetObject.name);
+                        }                        
+                    }
+
+                    newFileName = EditorUtility.SaveFilePanelInProject("Save As...", newFileName, "asset", "Saving painted model asmesh asset");
+                    if (newFileName == "") return false;
+                    //newPath = AssetDatabase.GenerateUniqueAssetPath(newPath);
+                    var mesh = Instantiate(_targetMesh) as Mesh;
+                    AssetDatabase.CreateAsset(mesh, newFileName);
                     reassign = true; 
                 } else
                 {
@@ -430,7 +463,7 @@ namespace DAPolyPaint
                 AssetDatabase.Refresh();
                 if (reassign)
                 {                    
-                    _targetMesh = AssetDatabase.LoadAssetAtPath<Mesh>(newPath);
+                    _targetMesh = AssetDatabase.LoadAssetAtPath<Mesh>(newFileName);
                     if (_skinned)
                     {
                         var meshComp = _targetObject.GetComponent<SkinnedMeshRenderer>();
