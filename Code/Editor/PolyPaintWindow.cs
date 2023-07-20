@@ -69,6 +69,7 @@ namespace DAPolyPaint
         //private bool _CursorOverObject;
         private RaycastHit _lastHit_mirror;
         private int _lastFace_Mirror;
+        private Color _tryPickColor;
         const float _statusColorBarHeight = 3;
         private const string DummyName = "$pp_dummy$";
         public readonly Color ColorStatusReady = Color.green;
@@ -203,20 +204,14 @@ namespace DAPolyPaint
             {
                 if (!_paintingMode)
                 {
-                    if (GUILayout.Button("START PAINTING"))
-                    {
-                        StartPaintMode();
-                    }
+                    if (GUILayout.Button("START PAINTING")) StartPaintMode();                                           
                 }
                 else
                 {
                     var oldColor = GUI.backgroundColor;
                     GUI.backgroundColor = ColorStatusPainting;
-                    if (GUILayout.Button("END SESSION"))
-                    {
-                        StopPaintMode();
-                    }
-                    GUI.backgroundColor = oldColor;
+                    if (GUILayout.Button("END SESSION")) StopPaintMode();
+                    GUI.backgroundColor = oldColor;                   
                 }
             }
 
@@ -262,17 +257,22 @@ namespace DAPolyPaint
             else if (_currToolCode == ToolType.loop)
             {
                 _loopTwoWays = EGL.ToggleLeft("Two Ways", _loopTwoWays);
-            } else
+            } 
+            else if (_currToolCode == ToolType.pick)
+            {               
+            }
+            else
             {
                 EGL.Space();
             }
+
             
-            
+
             //EGL.PrefixLabel("Max quad tolerance:");
             //if (_painter!=null)  _painter.QuadTolerance = EGL.Slider(_painter.QuadTolerance, 0.1f, 360f);
-            _mirrorCursor = EGL.ToggleLeft(new GUIContent("Mirror Cursor. Axis:", ""), _mirrorCursor);
+            _mirrorCursor = EGL.ToggleLeft(new GUIContent("Mirror Cursor. Axis:", ""), _mirrorCursor);            
             PaintEditor.MirrorMode = _mirrorCursor;
-            using (new EditorGUI.DisabledScope(!_mirrorCursor))
+            if (_mirrorCursor)
             {
                 _currMirrorAxis = GUILayout.Toolbar(_currMirrorAxis, _mirrorAxis);
                 _axisOffset = EGL.FloatField("Axis Offset:", _axisOffset);
@@ -281,7 +281,9 @@ namespace DAPolyPaint
                 PaintEditor.AxisOffset = _axisOffset;
                 if (PaintEditor.ShowMirrorPlane) SceneView.lastActiveSceneView.Repaint();
             }
+            
             GUILayout.EndVertical();
+
         }
 
         private void OnGUI_InputEvents()
@@ -563,13 +565,19 @@ namespace DAPolyPaint
                     }
                 }
 
+                //current colors
                 var cRect = EGL.GetControlRect(false, EditorGUIUtility.singleLineHeight);
-                cRect.width = cRect.width / 2;
-                cRect.x += cRect.width;
-                EditorGUI.LabelField(cRect, _lastUVpick.ToString());
-                cRect.x = cRect.width - cRect.height;
-                cRect.width = cRect.height;
-                EditorGUI.DrawRect(cRect, _lastPixelColor);
+                if (_currToolCode == ToolType.pick && _lastFace != -1)
+                {
+                    cRect.width = cRect.width / 2;
+                    EditorGUI.DrawRect(cRect, _lastPixelColor);
+                    cRect.x = cRect.width;
+                    EditorGUI.DrawRect(cRect, _tryPickColor);
+                }
+                else
+                {
+                    EditorGUI.DrawRect(cRect, _lastPixelColor);
+                }
             }
         }
 
@@ -709,13 +717,16 @@ namespace DAPolyPaint
             _prevFace = _lastFace;
             _prevFace_Mirror = _lastFace_Mirror;
             (_lastFace, _lastFace_Mirror)  = GetFaceHit(sv, currMousePos, _mirrorCursor);
-            if (_prevFace == -1 && _lastFace >= 0)
-            {
-                OnCursorEnterObject(sv.position);
-            } else if (_prevFace >=0 && _lastFace == -1) 
-            {
-                OnCursorExitObject(sv.position);
-            }
+           // _lastHit.
+
+            //TODO: useful but does nothing yet:
+            //if (_prevFace == -1 && _lastFace >= 0)
+            //{
+            //    OnCursorEnterObject(sv.position);
+            //} else if (_prevFace >=0 && _lastFace == -1) 
+            //{
+            //    OnCursorExitObject(sv.position);
+            //}
         }
         
         //Does a face hit, return face, also mirroered face if needed.
@@ -888,6 +899,14 @@ namespace DAPolyPaint
             else if (ev.type == EventType.MouseMove)
             {
                 DoFaceHit(scene, ev.mousePosition);
+                if (_currToolCode == ToolType.pick)
+                {
+                    if (_lastFace != -1)
+                    {
+                        TryPick(_lastHit);
+                        Repaint();
+                    }
+                }
                 if (_lastFace != _prevFace)
                 {
                     BuildCursor();
@@ -944,6 +963,11 @@ namespace DAPolyPaint
             {
                 if (!isAllowedInput(ev)) { ev.Use(); }
             }
+        }
+
+        private void TryPick(RaycastHit hit)
+        {            
+            _tryPickColor = _painter.GetTextureColor(hit.textureCoord);
         }
 
         private void DoMouseDownLeftClick(SceneView scene, int id, Event ev, int tool)
@@ -1116,7 +1140,7 @@ namespace DAPolyPaint
         {
             if (face != -1)
             {
-                _lastUVpick = _painter.GetUV(face);
+                _lastUVpick = _painter.GetUV(face);                
                 _lastPixelColor = _painter.GetTextureColor(_lastUVpick);
                 PaintEditor.SetPixelColor(_lastPixelColor);
             }
