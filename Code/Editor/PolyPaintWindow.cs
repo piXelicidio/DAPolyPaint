@@ -359,23 +359,21 @@ namespace DAPolyPaint
         //Try to apply the changes to the mesh, return false if the process is aborted.
         public bool SaveMeshAsset(bool optimizeMesh = false, bool forceNewFileName = false)
         {
-            var assetPath = AssetDatabase.GetAssetPath(_targetMesh);
-            var assetFolderPath = Path.GetFileName(Application.dataPath);
-            bool IsWithinAssets(string path)
-            {
-                return path.StartsWith(assetFolderPath, StringComparison.OrdinalIgnoreCase);
-            }
+            var currentMeshFile = AssetDatabase.GetAssetPath(_targetMesh);
+            Debug.Log(currentMeshFile);
+            var projectPath = Path.GetDirectoryName(Application.dataPath);
+            Debug.Log(projectPath);
 
-            Debug.Log(assetPath);
+            //Debug.Log(currentMeshPath);
             //Debug.Log(assetFolderPath);
-            if (string.IsNullOrEmpty(assetPath))
+            if (string.IsNullOrEmpty(currentMeshFile))
             {
                 Debug.Log("No asset path found for mesh");
                 return false;
             }
             else
             {
-                var format = Path.GetExtension(assetPath);                
+                var format = Path.GetExtension(currentMeshFile);                
 
                 if (optimizeMesh)
                 {                    
@@ -387,71 +385,27 @@ namespace DAPolyPaint
                 string newPath = "";
                 string newFileName = "";
                 if (format != ".asset" || forceNewFileName)
-                {
-                    /* var meshCompName = (_skinned) ? "SkinnedMeshRenderer" : "MeshFilter";
-
-                    // Somtimes the format is ""
-                    string nonEmptyMsgPrefix = $@"Since the original asset is a {format} the mesh will be saved as a new asset,";
-                    string emptyMsgPrefix = "The mesh will be saved as a new asset,";
-                    
-                    var userOk = EditorUtility.DisplayDialog("Saving modified mesh...",
-                                         $@"{(format == "" ? emptyMsgPrefix : nonEmptyMsgPrefix)} and the {meshCompName} reference updated.",
-                                         "OK", "Cancel");
-                    if (!userOk) return false;
-
-                    if (!IsWithinAssets(assetPath))
+                {                    
+                    if (currentMeshFile.Substring(0,6).ToUpper() == "ASSETS")
                     {
-                        newPath = Path.Combine(assetFolderPath, "Meshes");
-                        // Create storage path in Assets folder (Unity requirement)                        
-                        if (!AssetDatabase.IsValidFolder(newPath))
-                        {
-                            AssetDatabase.CreateFolder(assetFolderPath, "Meshes");
-                        }
+                        newPath = Path.Combine(projectPath, Path.GetDirectoryName(currentMeshFile));
                     } else
                     {
-                        newPath = Path.GetDirectoryName(assetPath);
+                        newPath = Path.Combine(projectPath, "Assets");                        
                     }
-
-
-                    string newFileName = Path.GetFileNameWithoutExtension(assetPath);
-                    if (format != "") 
-                    {
-                        newPath = Path.Combine(newPath, newFileName + "_pnt.asset");
-                    } else
-                    {
-                        
-                        if (newFileName == "unity default resources" )
-                        {
-                            newFileName = ConvertToValidFileName(_targetObject.name);
-                        }
-                        newPath = Path.Combine(newPath, newFileName + "_pnt.asset");
-                    }
-                    //Debug.Log(newPath);
-                    //Debug.Log(IsWithinAssets(newPath) ? "Within Assets" : "Not inside Assets");
-                    newPath = AssetDatabase.GenerateUniqueAssetPath(newPath);
-                    var mesh = Instantiate(_targetMesh) as Mesh;
-                    AssetDatabase.CreateAsset(mesh, newPath);  
-                   */
-                    
-                    if (!IsWithinAssets(assetPath))
-                    {
-                        newPath = assetFolderPath;
-                    }
-                    newFileName = Path.GetFileNameWithoutExtension(assetPath);
-                    if (format != "")
-                    {
-                        newPath = Path.Combine(newPath, newFileName + "_pnt.asset");
-                    }
-                    else
-                    {
-
+                    newFileName = Path.GetFileNameWithoutExtension(currentMeshFile);
+                    if (format == "")
+                    {                     
                         if (newFileName == "unity default resources")
                         {
-                            newFileName = ConvertToValidFileName(_targetObject.name);
+                            newFileName = ConvertToValidFileName(_targetMesh.name);
                         }                        
                     }
-
-                    newFileName = EditorUtility.SaveFilePanelInProject("Save As...", newFileName, "asset", "Saving painted model asmesh asset");
+                    newFileName += ".asset";
+                    //Debug.Log(newPath);
+                    //Debug.Log(newFileName);
+                    //newFileName = EditorUtility.SaveFilePanel("Save As...", newPath, newFileName,  "asset");
+                    newFileName = EditorUtility.SaveFilePanelInProject("Save As...", newFileName, "asset", "Saving as new mesh data asset", newPath);
                     if (newFileName == "") return false;
                     //newPath = AssetDatabase.GenerateUniqueAssetPath(newPath);
                     var mesh = Instantiate(_targetMesh) as Mesh;
