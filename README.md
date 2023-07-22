@@ -34,6 +34,7 @@ Get it here: [DA PolyPaint - Low Poly Customizer](https://assetstore.unity.com/p
 
 ### Brush
 ![Using Brush](docs~/using_brush.gif)
+
 Paint individual triangles (Or quads if auto-detect quad is activated).
 
 ### Full Repaint
@@ -41,7 +42,8 @@ Paint individual triangles (Or quads if auto-detect quad is activated).
 This applies the selected color to the entire model.
 
 ### Fill
-![Using Fill](docs~/using_fill.gif) 
+![Using Fill](docs~/using_fill.gif)
+ 
 Paint areas with the following modes:
 1. Flood: Fill continuous areas of the same color.
 2. Replace: Replace all ocurrences of the color for the whole model.
@@ -49,6 +51,7 @@ Paint areas with the following modes:
 
 ### Loop
 ![Using Loop](docs~/using_loop.gif)
+
 Paint along quad loops. Uncheck "Two Ways" if you want the stroke to go only in the direction of the mouse drag. Note that loop only works if the cursor is over a detected quad, and the mouse drag should cross one of its edges.
 
 ### Pick 
@@ -56,6 +59,7 @@ This allows you to sample colors directly from the 3D object surface.
 
 ### Mirror Cursor Axis
 ![Using Mirror](docs~/using_mirror.gif)
+
 Mirrors the current tool cursor along a selected axis. 
 
 ## Requirements and Compatibility <a name="requirements-and-compatibility"></a>
