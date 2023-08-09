@@ -252,7 +252,6 @@ namespace DAPolyPaint
                     bool ok = _painter.RemapTo(tex2d);
                     return ok;
                 }  else return false;
-                return true;
             }
         }
 

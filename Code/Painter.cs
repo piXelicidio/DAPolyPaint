@@ -778,7 +778,51 @@ namespace DAPolyPaint
 
         public bool RemapTo(Texture2D tex2d)
         {
-            throw new NotImplementedException();
+            void findNearest(Color c, out Color cOut, out Vector2 uvOut)
+            {
+                //TODO: try storing cache in Dictionary
+                cOut = Color.white;
+                uvOut = Vector2.zero;
+                float minDiff = float.MaxValue;
+
+                for (int y = 0; y < tex2d.height; y++)
+                {
+                    for (int x = 0; x < tex2d.width; x++)
+                    {
+                        var c2 = tex2d.GetPixel(x, y);
+                        var diff = ((Vector4) c2 - (Vector4) c).sqrMagnitude;
+                        if (diff < minDiff)
+                        {
+                            //Debug.Log(minDiff);
+                            minDiff = diff;
+                            cOut = c2;
+                            uvOut.x = (float) x / tex2d.width;
+                            uvOut.y = ((float) y / tex2d.height);
+                            Debug.Log("uvOUT: " + uvOut.ToString());
+                        }
+
+                    }
+                }
+            }
+
+            if (tex2d == null) return false;
+            if (tex2d.width == 0 || tex2d.height == 0) return false;
+            for (int i = 0; i < NumFaces; i++)
+            {
+                var oldColor = GetTextureColor(GetUV(i));
+                Color newColor;
+                Vector2 newUV;
+                findNearest(oldColor, out newColor, out newUV);   
+                Debug.Log("newUV:" + newUV.ToString());
+                SetUV(i, newUV, true);
+            }
+            //RefreshUVs();
+            return true;
+        }
+
+        private void RefreshUVs()
+        {
+            _targetMesh.SetUVs(_channel, _UVs);
         }
     }
 
