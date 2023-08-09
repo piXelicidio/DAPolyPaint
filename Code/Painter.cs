@@ -775,6 +775,11 @@ namespace DAPolyPaint
         {
             FillPaint(face, UV, true);
         }
+
+        public bool RemapTo(Texture2D tex2d)
+        {
+            throw new NotImplementedException();
+        }
     }
 
     public class MeshCopy

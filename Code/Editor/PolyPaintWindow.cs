@@ -1,13 +1,10 @@
-using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEditor;
 using EGL = UnityEditor.EditorGUILayout;
+using GL = UnityEngine.GUILayout;
 using System;
 using System.IO;
-using System.Text;
-using static UnityEngine.GridBrushBase;
-using UnityEditor.PackageManager;
 using System.Text.RegularExpressions;
 
 namespace DAPolyPaint 
@@ -70,6 +67,7 @@ namespace DAPolyPaint
         private RaycastHit _lastHit_mirror;
         private int _lastFace_Mirror;
         private Color _tryPickColor;
+        private Material _remapMaterial;
         const float _statusColorBarHeight = 3;
         private const string DummyName = "$pp_dummy$";
         public readonly Color ColorStatusReady = Color.green;
@@ -204,13 +202,13 @@ namespace DAPolyPaint
             {
                 if (!_paintingMode)
                 {
-                    if (GUILayout.Button("START PAINTING")) StartPaintMode();                                           
+                    if (GL.Button("START PAINTING")) StartPaintMode();                                           
                 }
                 else
                 {
                     var oldColor = GUI.backgroundColor;
                     GUI.backgroundColor = ColorStatusPainting;
-                    if (GUILayout.Button("END SESSION")) StopPaintMode();
+                    if (GL.Button("END SESSION")) StopPaintMode();
                     GUI.backgroundColor = oldColor;                   
                 }
             }
@@ -222,6 +220,7 @@ namespace DAPolyPaint
             using (new EditorGUI.DisabledScope(!_paintingMode))
             {
                 OnGUI_PaintingTools();
+                OnGUI_Remapping();
                 OnGUI_SavePaintedMesh();
             }
 
@@ -229,26 +228,54 @@ namespace DAPolyPaint
 
         }
 
+        private void OnGUI_Remapping()
+        {
+            EGL.Space();
+            GL.BeginVertical(EditorStyles.textArea);
+            if (GL.Button("Remmap to texture in..."))
+            {
+                bool ok = TryRemmapingTo(_remapMaterial);
+            }
+            _remapMaterial = (Material) EGL.ObjectField("Target Material", _remapMaterial, typeof(Material), true);
+            GL.EndVertical();
+        }
+
+        private bool TryRemmapingTo(Material remapMaterial)
+        {
+            if (_remapMaterial == null) return false;
+            else
+            {
+                var tex = remapMaterial.mainTexture;
+                if (tex != null)
+                {
+                    var tex2d = ToTexture2D(_targetTexture);
+                    bool ok = _painter.RemapTo(tex2d);
+                    return ok;
+                }  else return false;
+                return true;
+            }
+        }
+
         private void OnGUI_PaintingTools()
         {
             EGL.Space();
             if (_painter != null)
             {
-                if (GUILayout.Button("Full Repaint")) _painter.FullRepaint(_lastUVpick);
+                if (GL.Button("Full Repaint")) _painter.FullRepaint(_lastUVpick);
             }
             EGL.Space();
 
-            GUILayout.BeginVertical(EditorStyles.textArea);
+            GL.BeginVertical(EditorStyles.textArea);
             //TODO: toolbar selected parameter can be set to -1 to unselect all buttons.
             //TOOLBAR of: Brush, Fill, Loop, Pick
-            _currToolCode = GUILayout.Toolbar(_currToolCode, _toolNames);
+            _currToolCode = GL.Toolbar(_currToolCode, _toolNames);
             if (_currToolCode >= 0 && _currToolCode <= _toolNames.Length)
             {
                 EGL.LabelField(_toolHints[_currToolCode], EditorStyles.miniLabel);
             }
             if (_currToolCode == ToolType.fill)
             {
-                _fillVariant = GUILayout.SelectionGrid(_fillVariant, _fillVariantOptions, 3, EditorStyles.radioButton);
+                _fillVariant = GL.SelectionGrid(_fillVariant, _fillVariantOptions, 3, EditorStyles.radioButton);
             } 
             else if (_currToolCode == ToolType.brush)
             {
@@ -274,7 +301,7 @@ namespace DAPolyPaint
             PaintEditor.MirrorMode = _mirrorCursor;
             if (_mirrorCursor)
             {
-                _currMirrorAxis = GUILayout.Toolbar(_currMirrorAxis, _mirrorAxis);
+                _currMirrorAxis = GL.Toolbar(_currMirrorAxis, _mirrorAxis);
                 _axisOffset = EGL.FloatField("Axis Offset:", _axisOffset);
                 PaintEditor.ShowMirrorPlane = EGL.ToggleLeft("Show Mirror Plane", PaintEditor.ShowMirrorPlane);
                 PaintEditor.MirrorAxis = _currMirrorAxis;
@@ -282,7 +309,7 @@ namespace DAPolyPaint
                 if (PaintEditor.ShowMirrorPlane) SceneView.lastActiveSceneView.Repaint();
             }
             
-            GUILayout.EndVertical();
+            GL.EndVertical();
 
         }
 
@@ -321,23 +348,25 @@ namespace DAPolyPaint
             //saving mesh test
             EGL.Space();
             _autoSave = EGL.ToggleLeft("Auto-save at the end of the session", _autoSave);
+            EGL.BeginHorizontal();
             using (new EditorGUI.DisabledScope(_autoSave))
             {                
-                if (GUILayout.Button(new GUIContent("Save", "Save the modified painted mesh")))
+                if (GL.Button(new GUIContent("Save", "Save the modified painted mesh")))
                 {
                     if (SaveMeshAsset(false, false))
                     {
                         _painter.Undo_Reset();
                     };
                 }
-                if (GUILayout.Button(new GUIContent("Save As...", "Save the modified painted mesh")))
+                if (GL.Button(new GUIContent("Save As...", "Save the modified painted mesh")))
                 {
                     if (SaveMeshAsset(false, true))
                     {
                         _painter.Undo_Reset();
                     };
-                }
-            }            
+                }               
+            }
+            EGL.EndHorizontal();
         }
         
         public string ConvertToValidFileName(string input, char replacement = '_')
@@ -1175,35 +1204,42 @@ namespace DAPolyPaint
             _skinned = false;
             if (_targetObject != null)
             {
-                var solid = _targetObject.GetComponent<MeshFilter>();
-                var skinned = _targetObject.GetComponent<SkinnedMeshRenderer>();
-                if (solid != null)
-                {
-                    _targetMesh = solid.sharedMesh;
-                }
-                else if (skinned != null)
-                {
-                    _targetMesh = skinned.sharedMesh;
-                    _skinned = true;
-                }
-                else
-                {
-                    _targetMesh = null;
-                }
+                CheckComponents(_targetObject);
+            }
+            else
+            {
+                _targetMesh = null;
+                _targetTexture = null;
+                _textureData = null;
+            }
+            Repaint();
+        }
 
-                var r = _targetObject.GetComponent<Renderer>();
-                if (r != null)
+        private void CheckComponents(GameObject target)
+        {
+            var solid = target.GetComponent<MeshFilter>();
+            var skinned = target.GetComponent<SkinnedMeshRenderer>();
+            if (solid != null)
+            {
+                _targetMesh = solid.sharedMesh;
+            }
+            else if (skinned != null)
+            {
+                _targetMesh = skinned.sharedMesh;
+                _skinned = true;
+            }
+            else
+            {
+                _targetMesh = null;
+            }
+
+            var r = target.GetComponent<Renderer>();
+            if (r != null)
+            {
+                _targetTexture = r.sharedMaterial.mainTexture;
+                if (_targetTexture != null)
                 {
-                    _targetTexture = r.sharedMaterial.mainTexture;
-                    if (_targetTexture != null)
-                    {
-                        _textureData = ToTexture2D(_targetTexture);
-                    } else
-                    {
-                        _targetTexture = null;
-                        _textureData = null;
-                    }
-                    
+                    _textureData = ToTexture2D(_targetTexture);
                 }
                 else
                 {
@@ -1214,11 +1250,9 @@ namespace DAPolyPaint
             }
             else
             {
-                _targetMesh = null;
                 _targetTexture = null;
                 _textureData = null;
             }
-            Repaint();
         }
 
         void PrepareObject()
