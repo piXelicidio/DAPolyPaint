@@ -32,7 +32,7 @@ namespace DAPolyPaint
         int _channel = 0;
         Texture2D _textureData;
         private MeshCopy _oldMesh;
-        
+
         public Mesh Target { get { return _targetMesh; } }
         public int NumUVCalls { get; private set; }
         public int NumFaces { get { return _triangles.Length / 3; } }
@@ -54,7 +54,7 @@ namespace DAPolyPaint
             _targetMesh = target;
             _skinned = skinned;
             _textureData = texture;
-            RebuildMeshForPainting();            
+            RebuildMeshForPainting();
         }
 
         ///<summary>Rebuild the mesh data to get ready for painting.</summary>
@@ -97,7 +97,7 @@ namespace DAPolyPaint
 
             _UVs = newUVs; //keep ref for painting
             _vertices = newVertices.ToArray();
-            _triangles = newTris.ToArray();            
+            _triangles = newTris.ToArray();
 
 
 
@@ -107,7 +107,7 @@ namespace DAPolyPaint
 
             Indexify();
             //Indexify_boundBox();
-            
+
             s += "<b>Indexify, Elapsed:</b> " + (Environment.TickCount - t).ToString() + "ms - ";
             t = Environment.TickCount;
 
@@ -160,10 +160,10 @@ namespace DAPolyPaint
             var facesUsingVert = new List<List<int>>();
             _indexedFaces = new int[_triangles.Length];
             var dumbSymmetryTest = 0;
-            
-            for (int i=0; i<NumVerts; i++)
+
+            for (int i = 0; i < NumVerts; i++)
             {
-                var v = _vertices[i];                
+                var v = _vertices[i];
                 int idx;
                 if (!vertsDir.TryGetValue(v, out idx))
                 {
@@ -179,7 +179,7 @@ namespace DAPolyPaint
                 facesUsingVert[idx].Add(i / 3);
             }
 
-            for (int i=0; i<_triangles.Length; i++)
+            for (int i = 0; i < _triangles.Length; i++)
             {
                 _indexedFaces[i] = indexReplace[_triangles[i]];
             }
@@ -223,7 +223,7 @@ namespace DAPolyPaint
             }
             _indexedVerts = sharedVerts.ToArray();
             _facesUsingVert = facesUsingVert.ToArray();
-                        
+
             //Debug.Log(String.Format("NumVerts before:{0} after:{1} dumbSymmetryTest:{2}", NumVerts, sharedVerts.Count, dumbSymmetryTest));
         }
 
@@ -250,7 +250,7 @@ namespace DAPolyPaint
             bool boundBoxContains(Vector3 point)
             {
                 return point.x >= minBox.x && point.y >= minBox.y && point.z >= minBox.z &&
-                       point.x <= maxBox.x && point.y <= maxBox.y && point.z <= maxBox.z ;
+                       point.x <= maxBox.x && point.y <= maxBox.y && point.z <= maxBox.z;
             }
 
             void boundBoxEncapsulate(Vector3 point)
@@ -269,8 +269,8 @@ namespace DAPolyPaint
                 int idx = -1;
                 if (boundBoxContains(v))
                 {
-                    idx = sharedVerts.FindIndex(x => x == v);                    
-                } 
+                    idx = sharedVerts.FindIndex(x => x == v);
+                }
 
                 if (idx == -1)
                 {
@@ -308,17 +308,17 @@ namespace DAPolyPaint
 
         private void CalcAngles()
         {
-            _angles = new float[_indexedFaces.Length];            
-            for (var f=0; f<NumFaces; f++)
+            _angles = new float[_indexedFaces.Length];
+            for (var f = 0; f < NumFaces; f++)
             {
-                for (var i=0; i<3; i++)
+                for (var i = 0; i < 3; i++)
                 {
                     var thisIdx = f * 3 + i;
                     var nextIdx = f * 3 + (i + 1) % 3;
-                    var prevIdx = f * 3 + ((i+3) - 1) % 3;
+                    var prevIdx = f * 3 + ((i + 3) - 1) % 3;
                     var v1 = _indexedVerts[_indexedFaces[nextIdx]] - _indexedVerts[_indexedFaces[thisIdx]];
                     var v2 = _indexedVerts[_indexedFaces[prevIdx]] - _indexedVerts[_indexedFaces[thisIdx]];
-                    _angles[f*3+i] = Vector3.Angle(v1, v2);
+                    _angles[f * 3 + i] = Vector3.Angle(v1, v2);
                 }
             }
         }
@@ -341,7 +341,7 @@ namespace DAPolyPaint
         {
             var low = Math.Min(p1, p2);
             var high = Math.Max(p1, p2);
-            if (low==0 && high==2)
+            if (low == 0 && high == 2)
             {
                 return 2;
             } else
@@ -356,7 +356,7 @@ namespace DAPolyPaint
         {
             void FindCoincidences(int face1, int face2)
             {
-                if (face1 == face2) return;                
+                if (face1 == face2) return;
                 var count = 0;
                 int[] pos = new int[3];
                 int[] posOther = new int[3];
@@ -386,7 +386,7 @@ namespace DAPolyPaint
                     link.edge.v2 = _indexedFaces[face1 * 3 + pos[1]];
                     link.side = GetTriangleSide(pos[0], pos[1]);
                     link.pOut = 3 - (pos[0] + pos[1]); //point left out
-                                                       
+
                     var otherFaceSide = GetTriangleSide(posOther[0], posOther[1]);
                     var otherLink = _faceData[face2].links[otherFaceSide];
                     bool otherOk = otherLink == null;
@@ -399,9 +399,9 @@ namespace DAPolyPaint
                     if (_faceData[face1].links[link.side] == null && otherOk)
                     {
                         //other face has this side unlinked or linked to me?                    
-                        
-                            _faceLinks[face1].Add(link);
-                            _faceData[face1].links[link.side] = link;                        
+
+                        _faceLinks[face1].Add(link);
+                        _faceData[face1].links[link.side] = link;
                     }
                 }
             }
@@ -417,11 +417,11 @@ namespace DAPolyPaint
 
             var myVerts = new int[3];
             for (int i = 0; i < NumFaces; i++)
-            {                
+            {
                 var nearFaces = GetFacesUsingVerts(GetFaceVertIdxs(i));
                 foreach (int f in nearFaces)
                 {
-                   FindCoincidences(i, f);                   
+                    FindCoincidences(i, f);
                 }
             }
 
@@ -430,9 +430,9 @@ namespace DAPolyPaint
             {
                 var links = _faceLinks[i];
                 sum += links.Count;
-                for (int j = links.Count-1; j >= 0; j--)
+                for (int j = links.Count - 1; j >= 0; j--)
                 {
-                   var backlink = _faceLinks[links[j].with].Find(x => x.with == i);
+                    var backlink = _faceLinks[links[j].with].Find(x => x.with == i);
                     if (backlink != null)
                     {
                         backlink.backLinkIdx = j;
@@ -452,25 +452,25 @@ namespace DAPolyPaint
         void DebugFace(int faceIdx)
         {
             Debug.Log("Face: " + faceIdx.ToString());
-            Debug.Log(String.Format("v0: {0}",_indexedFaces[faceIdx]) );
-            Debug.Log(String.Format("v1: {0}",_indexedFaces[faceIdx+1]));
-            Debug.Log(String.Format("v2: {0}",_indexedFaces[faceIdx+2]));
+            Debug.Log(String.Format("v0: {0}", _indexedFaces[faceIdx]));
+            Debug.Log(String.Format("v1: {0}", _indexedFaces[faceIdx + 1]));
+            Debug.Log(String.Format("v2: {0}", _indexedFaces[faceIdx + 2]));
 
         }
 
         public HashSet<int> GetFacesUsingVerts(int[] verts)
         {
             var result = new HashSet<int>();
-            for (int i=0; i<verts.Length; i++)
+            for (int i = 0; i < verts.Length; i++)
             {
-                result.UnionWith(_facesUsingVert[verts[i]]);                
+                result.UnionWith(_facesUsingVert[verts[i]]);
             }
             return result;
         }
 
 
 
-        
+
         /// <summary>
         /// Finds the best neighbor face to complete a quad.
         /// </summary>
@@ -482,8 +482,8 @@ namespace DAPolyPaint
             if (face == -1) return -1;
             var best = -1;
             var nearBest = QuadTolerance;
-      
-            for (int i=0; i<_faceLinks[face].Count; i++)
+
+            for (int i = 0; i < _faceLinks[face].Count; i++)
             {
                 var linkTo = _faceLinks[face][i];
                 var faceOther = linkTo.with;
@@ -493,7 +493,7 @@ namespace DAPolyPaint
                     Debug.LogWarning("Bad backlinkIdx!");
                 }
 
-                
+
                 var angles = new float[4];
                 //the two corners that are not part of the common edge
                 angles[0] = _angles[face * 3 + linkTo.pOut];
@@ -533,12 +533,12 @@ namespace DAPolyPaint
         //so only one is enough
         public Vector2 GetUV(int face)
         {
-            if (face != - 1 && face < _UVs.Count)
+            if (face != -1 && face < _UVs.Count)
             {
-                return _UVs[face*3];
+                return _UVs[face * 3];
             } else
             {
-                return new Vector2(-1,-1);
+                return new Vector2(-1, -1);
             }
         }
 
@@ -555,12 +555,12 @@ namespace DAPolyPaint
 
         public List<FaceLink> GetFaceLinks(int face)
         {
-            return _faceLinks[face]; 
+            return _faceLinks[face];
         }
 
 
         public void FillPaint(int startFace, Vector2 uvc, bool DontCheckColor = false)
-        {            
+        {
             var bk_pixelColor = GetTextureColor(GetUV(startFace));
             var border = new HashSet<int>();
             border.Add(startFace);
@@ -583,7 +583,7 @@ namespace DAPolyPaint
                 _targetMesh.SetUVs(_channel, _UVs);  //can be called at the end just once
                 //find neighbors
                 neighbors.Clear();
-                
+
                 foreach (int face in border)
                 {
                     var faceLinks = GetFaceLinks(face);
@@ -609,7 +609,7 @@ namespace DAPolyPaint
                 (border, neighbors) = (neighbors, border);
 
                 iters++;
-            } while (border.Count > 0 && iters<1000);  //TODO: Improve this arbitrary limit
+            } while (border.Count > 0 && iters < 1000);  //TODO: Improve this arbitrary limit
             //Debug.Log(String.Format("Iters:{0} Elapsed:{1}ms", iters, Environment.TickCount - t));
         }
 
@@ -626,7 +626,7 @@ namespace DAPolyPaint
         /// </summary>
         public FaceLink FindLink(int fromFace, int toFace)
         {
-            if (fromFace!=-1  && toFace!=1)
+            if (fromFace != -1 && toFace != 1)
             {
                 foreach (var fl in _faceLinks[fromFace])
                 {
@@ -638,18 +638,18 @@ namespace DAPolyPaint
             }
             return null;
         }
-                
+
         /// <summary>
         /// Given two adjacent faces (f1 and f2), find a loop.
         /// </summary>
         public HashSet<int> FindLoop(int f1, int f2)
-        {            
+        {
             if (f1 == -1 || f2 == -1) return new HashSet<int>();
 
             var result = new HashSet<int>();
 
             //confirm they are actually adjacents            
-            var linkToF2 = FindLink(f1, f2);            
+            var linkToF2 = FindLink(f1, f2);
 
             //is F2 part of a Quad?
             var f2_quadBro = FindQuad(f2);
@@ -657,7 +657,7 @@ namespace DAPolyPaint
             //is F1 my Quad brother?
             bool weQuad = f2_quadBro == f1;
 
-            if (linkToF2 != null && f2_quadBro != -1 && !weQuad) 
+            if (linkToF2 != null && f2_quadBro != -1 && !weQuad)
             {
                 result.Add(f2);
                 bool noOverlaps = true;
@@ -665,7 +665,7 @@ namespace DAPolyPaint
                 var breakLimit = 1000; //TODO: arbitrary temporal safe limit, should go away with better solution
                 do
                 {
-                    
+
                     var SharedEdge_f1_f2 = linkToF2.edge;
                     var jumpToFace = -1;
                     foreach (FaceLink fl in _faceLinks[f2_quadBro])
@@ -673,7 +673,7 @@ namespace DAPolyPaint
                         if (!fl.edge.HaveSharedVerts(SharedEdge_f1_f2))
                         {
                             //found oppsite edge
-                            jumpToFace = fl.with;                            
+                            jumpToFace = fl.with;
                             //AddFace(jumpToFace);
                             break;
                         };
@@ -686,7 +686,7 @@ namespace DAPolyPaint
                     weQuad = f2_quadBro == f1;
                     linkToF2 = FindLink(f1, f2);
                     breakLimit--;
-                } while (breakLimit > 0 && f2_quadBro != -1 && !weQuad && linkToF2 != null && noOverlaps) ;
+                } while (breakLimit > 0 && f2_quadBro != -1 && !weQuad && linkToF2 != null && noOverlaps);
             }
 
             return result;
@@ -714,16 +714,16 @@ namespace DAPolyPaint
                 {
                     _undoLevels[_undoPos] = copy;
                 }
-                
+
             }
         }
 
         public void Undo_Undo()
-        {            
-            if (_undoPos > 0) 
+        {
+            if (_undoPos > 0)
             {
-                var state = _undoLevels[_undoPos-1];
-                for (int i=0; i<state.Count; i++)
+                var state = _undoLevels[_undoPos - 1];
+                for (int i = 0; i < state.Count; i++)
                 {
                     _UVs[i] = state[i];
                 }
@@ -736,12 +736,12 @@ namespace DAPolyPaint
 
         public void Undo_Redo()
         {
-            if (_undoSequenceCount>0)
+            if (_undoSequenceCount > 0)
             {
                 _undoSequenceCount--;
                 _undoPos++;
                 var state = _undoLevels[_undoPos];
-                for (int i=0; i<state.Count; i++)
+                for (int i = 0; i < state.Count; i++)
                 {
                     _UVs[i] = state[i];
                 }
@@ -768,7 +768,7 @@ namespace DAPolyPaint
                     }
                 }
                 _targetMesh.SetUVs(_channel, _UVs);
-            }            
+            }
         }
 
         public void FillElement(int face, Vector2 UV)
@@ -776,12 +776,29 @@ namespace DAPolyPaint
             FillPaint(face, UV, true);
         }
 
+        class TexelData { 
+            public float x; public float y; public Color color; 
+            public TexelData(float _x, float _y, Color _color)
+            {
+                x = _x; y = _y; color = _color;
+            }
+        };
+
         public bool RemapTo(Texture2D tex2d)
         {
+            var pixels = tex2d.GetPixelData<Color32>(0);
             
+            var ColorCache = new Dictionary<Color32, TexelData>();
+
+            Color32 GetPixel(int x, int y)
+            {
+                return pixels[y * tex2d.width + x];
+            }
+
             Vector2 ImproveTexel(int x, int y)
-            { //TODO: not doing well... debug...
-                var c = tex2d.GetPixel(x, y);
+            { 
+                //TODO: still not perfect, investigate
+                var c = GetPixel(x, y);
                 var sameColor = true;
                 var count = 0;
                 //ensuring the seek never overflows
@@ -795,8 +812,8 @@ namespace DAPolyPaint
                     while (sameColor)
                     {
                         count++;
-                        var c2 = tex2d.GetPixel(x + count, y + count);
-                        sameColor = (c == c2) && (count < maxCount);
+                        var c2 = GetPixel(x + count, y + count);
+                        sameColor = (count < maxCount) && c.r == c2.r && c.g == c2.g && c.b == c2.b;
                     }
                     if (count>2)
                     {
@@ -807,41 +824,56 @@ namespace DAPolyPaint
                 return new Vector2(x, y);
             }
 
+
             void findNearest(Color c, out Color cOut, out Vector2 uvOut)
             {
-                //TODO: try storing cache in Dictionary
-                cOut = Color.white;
-                uvOut = Vector2.zero;
-                int xx = 0;
-                int yy = 0;
-                float minDiff = float.MaxValue;
+                Color32 c32 = c;
 
-                for (int y = 0; y < tex2d.height; y++)
+                TexelData texel;
+                if (ColorCache.TryGetValue(c32, out texel))
                 {
-                    for (int x = 0; x < tex2d.width; x++)
-                    {
-                        var c2 = tex2d.GetPixel(x, y);
-                        var diff = ((Vector4) c2 - (Vector4) c).sqrMagnitude;
-                        if (diff < minDiff)
-                        {
-                            //Debug.Log(minDiff);
-                            minDiff = diff;
-                            cOut = c2;
-                            xx = x; yy = y;
-                        }
-
-                    }
+                    cOut = texel.color;
+                    uvOut.x = texel.x;
+                    uvOut.y = texel.y;
                 }
+                else
+                {
 
-                //improve texel position avoiding borders
-                var betterTexel = ImproveTexel(xx, yy);
+                    cOut = Color.white;
+                    uvOut = Vector2.zero;
+                    int xx = 0;
+                    int yy = 0;
+                    float minDiff = float.MaxValue;
 
-                uvOut.x = betterTexel.x / tex2d.width;
-                uvOut.y = betterTexel.y / tex2d.height;
-                
+                    for (int y = 0; y < tex2d.height; y++)
+                    {
+                        for (int x = 0; x < tex2d.width; x++)
+                        {
+                            var pix = GetPixel(x, y);
+                            var c2 = (Color)pix;
+                            var diff = ((Vector4)c2 - (Vector4)c).sqrMagnitude;
+                            if (diff < minDiff)
+                            {
+                                //Debug.Log(minDiff);
+                                minDiff = diff;
+                                cOut = c2;
+                                xx = x; yy = y;
+                            }
+
+                        }
+                    }
+
+                    //improve texel position avoiding borders
+                    var betterTexel = ImproveTexel(xx, yy);
+                    //Vector2 betterTexel = new Vector2(xx, yy);
+                    uvOut.x = betterTexel.x / tex2d.width;
+                    uvOut.y = betterTexel.y / tex2d.height;
+                    ColorCache.Add(c32, new TexelData(uvOut.x, uvOut.y, cOut));
+                }
 
             }
 
+            var t = Environment.TickCount;
             if (tex2d == null) return false;
             if (tex2d.width == 0 || tex2d.height == 0) return false;
             for (int i = 0; i < NumFaces; i++)
@@ -850,10 +882,10 @@ namespace DAPolyPaint
                 Color newColor;
                 Vector2 newUV;
                 findNearest(oldColor, out newColor, out newUV);   
-                Debug.Log("newUV:" + newUV.ToString());
-                SetUV(i, newUV, true);
+                SetUV(i, newUV, false);
             }
-            //RefreshUVs();
+            RefreshUVs();
+            Debug.Log("Remap delay: " + (Environment.TickCount - t).ToString() + "ms");
             return true;
         }
 
