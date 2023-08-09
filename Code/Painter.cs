@@ -778,11 +778,42 @@ namespace DAPolyPaint
 
         public bool RemapTo(Texture2D tex2d)
         {
+            
+            Vector2 ImproveTexel(int x, int y)
+            { //TODO: not doing well... debug...
+                var c = tex2d.GetPixel(x, y);
+                var sameColor = true;
+                var count = 0;
+                //ensuring the seek never overflows
+                var maxCount = tex2d.width - x - 1;
+                var heightLimit = tex2d.height - y - 1;
+                if (heightLimit < maxCount) maxCount = heightLimit;
+                //also 20 pixels away is enough
+                if (maxCount > 20) maxCount = 20;
+                if (maxCount>2)
+                {
+                    while (sameColor)
+                    {
+                        count++;
+                        var c2 = tex2d.GetPixel(x + count, y + count);
+                        sameColor = (c == c2) && (count < maxCount);
+                    }
+                    if (count>2)
+                    {
+                        x = x + count / 2;
+                        y = y + count / 2;
+                    }
+                }
+                return new Vector2(x, y);
+            }
+
             void findNearest(Color c, out Color cOut, out Vector2 uvOut)
             {
                 //TODO: try storing cache in Dictionary
                 cOut = Color.white;
                 uvOut = Vector2.zero;
+                int xx = 0;
+                int yy = 0;
                 float minDiff = float.MaxValue;
 
                 for (int y = 0; y < tex2d.height; y++)
@@ -796,13 +827,19 @@ namespace DAPolyPaint
                             //Debug.Log(minDiff);
                             minDiff = diff;
                             cOut = c2;
-                            uvOut.x = (float) x / tex2d.width;
-                            uvOut.y = ((float) y / tex2d.height);
-                            Debug.Log("uvOUT: " + uvOut.ToString());
+                            xx = x; yy = y;
                         }
 
                     }
                 }
+
+                //improve texel position avoiding borders
+                var betterTexel = ImproveTexel(xx, yy);
+
+                uvOut.x = betterTexel.x / tex2d.width;
+                uvOut.y = betterTexel.y / tex2d.height;
+                
+
             }
 
             if (tex2d == null) return false;

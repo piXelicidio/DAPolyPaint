@@ -248,7 +248,7 @@ namespace DAPolyPaint
                 var tex = remapMaterial.mainTexture;
                 if (tex != null)
                 {
-                    var tex2d = ToTexture2D(_targetTexture);
+                    var tex2d = ToTexture2D(tex);
                     bool ok = _painter.RemapTo(tex2d);
                     return ok;
                 }  else return false;
