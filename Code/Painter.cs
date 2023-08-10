@@ -784,7 +784,7 @@ namespace DAPolyPaint
             }
         };
 
-        public bool RemapTo(Texture2D tex2d)
+        public bool RemapTo(Texture2D tex2d, bool switchTexture = false)
         {
             var pixels = tex2d.GetPixelData<Color32>(0);
             
@@ -885,6 +885,7 @@ namespace DAPolyPaint
                 SetUV(i, newUV, false);
             }
             RefreshUVs();
+            if (switchTexture) _textureData = tex2d;
             Debug.Log("Remap delay: " + (Environment.TickCount - t).ToString() + "ms");
             return true;
         }

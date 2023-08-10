@@ -6,6 +6,7 @@ using GL = UnityEngine.GUILayout;
 using System;
 using System.IO;
 using System.Text.RegularExpressions;
+using static UnityEngine.GraphicsBuffer;
 
 namespace DAPolyPaint 
 {
@@ -14,66 +15,69 @@ namespace DAPolyPaint
     /// </summary>
     public class PolyPaintWindow : EditorWindow
     {
+        #region ---------- Painting State ----------
         Painter _painter;
-
-        private const string _toolName = "DAPolyPaint";
         bool _paintingMode;
-        bool _objectInfoFoldout = true;
-        bool _isPressed = false;
-
+        bool _isMousePressed = false;
         GameObject _targetObject;
         GameObject _dummyObject;
         MeshCollider _dummyCollider;
         Mesh _targetMesh;
-        private Vector3[] _vertices;
-        private bool _skinned;
-        private Mesh _skinAffected;
-        private Vector3[] _verticesSkinned;
+        Vector3[] _vertices;
+        bool _skinned;
+        Mesh _skinAffected;
+        Vector3[] _verticesSkinned;
         Texture _targetTexture;
         Texture2D _textureData;
         Vector3 _currMousePosCam;
-
         RaycastHit _lastHit;
         int _lastFace; //last face hit by raycast
         int _prevFace; //previous face hit by raycast;
-        private int _prevFace_Mirror;
-        private PaintCursor _paintCursor;
+        int _prevFace_Mirror;
+        PaintCursor _paintCursor;
         Vector2 _lastUVpick;
-        private Color _lastPixelColor;
-        private Vector2 _scrollPos;
-        private MeshCollider _meshCollider;
-        private bool _autoQuads = true;
-        private bool _loopTwoWays = true;
-        private bool _mirrorCursor = false;
-        private int _currMirrorAxis;
-        private float _axisOffset;
-        private readonly string[] _toolNames = new string[] { "Brush", "Fill", "Loop", "Pick" };
-        private readonly string[] _mirrorAxis = new string[] { "X", "Y", "Z" };
-        private readonly string[] _toolHints = new string[]
+        Color _lastPixelColor;
+        Vector2 _scrollPos;
+        MeshCollider _meshCollider;
+        RaycastHit _lastHit_mirror;
+        int _lastFace_Mirror;
+        Color _tryPickColor;
+        Material _remapMaterial;
+        const string DummyName = "$pp_dummy$";
+        #endregion
+
+
+        #region --------- User Interface ---------
+        bool _objectInfoFoldout = true;
+        const string _toolName = "DAPolyPaint";
+        bool _autoQuads = true;
+        bool _loopTwoWays = true;
+        bool _mirrorCursor = false;
+        int _currMirrorAxis;
+        float _axisOffset;
+        readonly string[] _toolNames = new string[] { "Brush", "Fill", "Loop", "Pick" };
+        readonly string[] _mirrorAxis = new string[] { "X", "Y", "Z" };
+        readonly string[] _toolHints = new string[]
         {
             "Click or Drag over faces", //brush
             "Click a starting face", //fill
             "Drag over a quad edge", //loop
             "Click a face to get color" //pick
         };
-        private int _currToolCode = 0;
-        
-        private int _fillVariant;
-        private readonly string[] _fillVariantOptions = new string[] { " Flood", " Replace", " Element" };
-        private bool _anyModifiers = false;
-        private int _savedTool;
-        private bool _autoSave = false;
-        //private bool _CursorOverObject;
-        private RaycastHit _lastHit_mirror;
-        private int _lastFace_Mirror;
-        private Color _tryPickColor;
-        private Material _remapMaterial;
+        int _currToolCode = 0;        
+        int _fillVariant;
+        readonly string[] _fillVariantOptions = new string[] { " Flood", " Replace", " Element" };
+        bool _anyModifiers = false;
+        int _savedTool;
+        bool _autoSave = false;
         const float _statusColorBarHeight = 3;
-        private const string DummyName = "$pp_dummy$";
         public readonly Color ColorStatusReady = Color.green;
         public readonly Color ColorStatusPainting = new Color(1, 0.4f, 0);//orange
         public readonly Color ColorStatusError = Color.red;
+        private bool _autoSwitchMaterial = true;
+        #endregion
 
+        //---------------------------------------------------------------------------------------------
         [MenuItem("Tools/DA/Poly Paint")]
         public static void ShowWindow()
         {
@@ -232,24 +236,39 @@ namespace DAPolyPaint
         {
             EGL.Space();
             GL.BeginVertical(EditorStyles.textArea);
-            if (GL.Button("Remmap to texture in..."))
-            {
-                bool ok = TryRemmapingTo(_remapMaterial);
-            }
+            var RemapClicked = GL.Button("Remmap to texture in...");                          
             _remapMaterial = (Material) EGL.ObjectField("Target Material", _remapMaterial, typeof(Material), true);
+            _autoSwitchMaterial = EGL.ToggleLeft("Switch Material after remap", _autoSwitchMaterial);
+
+            if (RemapClicked)
+            {
+                bool ok = TryRemmapingTo(_remapMaterial, out var tex2d, _autoSwitchMaterial);
+                if (ok && _autoSwitchMaterial)
+                {
+                    if (_targetObject.TryGetComponent<Renderer>(out var r))
+                    {
+                        r.material = _remapMaterial;
+                        _targetTexture = r.sharedMaterial.mainTexture;
+                        _textureData = tex2d;                        
+                    }
+                }
+            }
+
             GL.EndVertical();
         }
 
-        private bool TryRemmapingTo(Material remapMaterial)
+
+        private bool TryRemmapingTo(Material remapMaterial, out Texture2D tex2d, bool switchTexure = false)
         {
+            tex2d = null;
             if (_remapMaterial == null) return false;
             else
             {
                 var tex = remapMaterial.mainTexture;
                 if (tex != null)
                 {
-                    var tex2d = ToTexture2D(tex);
-                    bool ok = _painter.RemapTo(tex2d);
+                    tex2d = ToTexture2D(tex);
+                    bool ok = _painter.RemapTo(tex2d, switchTexure);
                     return ok;
                 }  else return false;
             }
@@ -918,7 +937,7 @@ namespace DAPolyPaint
                         _painter.Undo_SaveState();
                     }
                     ReleaseInput(ev);
-                    _isPressed = false;
+                    _isMousePressed = false;
                 }
             }
             //when a key is pressed down
@@ -955,7 +974,7 @@ namespace DAPolyPaint
         private void DoMouseDownLeftClick(SceneView scene, int id, Event ev, int tool)
         {
             AcquireInput(ev, id);
-            _isPressed = true;
+            _isMousePressed = true;
             if (_targetMesh != null)
             {
                 DoFaceHit(scene, ev.mousePosition);
@@ -998,7 +1017,7 @@ namespace DAPolyPaint
             if (_lastFace != _prevFace)
             {
                 BuildCursor();
-                if (_isPressed)
+                if (_isMousePressed)
                 {
                     if (tool == ToolType.loop)
                     {
