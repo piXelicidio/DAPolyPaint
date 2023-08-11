@@ -7,6 +7,7 @@ using System;
 using System.IO;
 using System.Text.RegularExpressions;
 using static UnityEngine.GraphicsBuffer;
+using UnityEngine.SceneManagement;
 
 namespace DAPolyPaint 
 {
@@ -286,6 +287,7 @@ namespace DAPolyPaint
                 if (GL.Button("Full Repaint"))
                 {
                     _painter.FullRepaint(_lastUVpick);
+                    SceneView.lastActiveSceneView.Repaint();
                     _painter.Undo_SaveState();
                 }
             }
@@ -489,6 +491,8 @@ namespace DAPolyPaint
                         meshComp.sharedMesh = _targetMesh;
                         PrefabUtility.RecordPrefabInstancePropertyModifications(meshComp);
                     }
+                    CheckComponents(_targetObject);
+                    PrepareObject();
                 }
                 return true;
             }
