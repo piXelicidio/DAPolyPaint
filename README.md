@@ -62,6 +62,10 @@ This allows you to sample colors directly from the 3D object surface.
 
 Mirrors the current tool cursor along a selected axis. 
 
+## Utilities
+### Remap To Texture
+Easily switch between color palettes without disrupting your UV mapping. This feature analyzes a new texture and reassigns UVs to the most similar colors, allowing for seamless transitions between palettes and optimization across multiple models. Ideal for low-poly art creation and texture consolidation.
+
 ## Requirements and Compatibility <a name="requirements-and-compatibility"></a>
 - A mesh with a Mesh Filter or Skinned Mesh Renderer component.
 - A material with a diffuse texture assigned. (This will act as palette color)
@@ -82,3 +86,6 @@ Digging DA Poly Paint? Keep the colors flowing by snagging my low-poly character
 Check out: [City People Mega-Pack](https://assetstore.unity.com/packages/3d/characters/city-people-mega-pack-203329)
 
 Your support helps paint a vibrant future for everyone. 🎨🌈
+
+## Help & Support
+| [PolyChat forum](https://github.com/piXelicidio/PolyChat/discussions/categories/scripted-tools) | [direct e-mail](mailto:denys.almaral@gmail.com) | 

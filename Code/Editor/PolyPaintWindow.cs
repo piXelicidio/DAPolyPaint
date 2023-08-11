@@ -229,8 +229,8 @@ namespace DAPolyPaint
             using (new EditorGUI.DisabledScope(!_paintingMode))
             {
                 OnGUI_PaintingTools();
-                OnGUI_Remapping();
                 OnGUI_SavePaintedMesh();
+                OnGUI_Remapping();                
             }
 
             EGL.EndScrollView();
@@ -241,13 +241,13 @@ namespace DAPolyPaint
         {
             EGL.Space();
             GL.BeginVertical(EditorStyles.textArea);
-            var RemapClicked = GL.Button("Remmap to texture in...");                          
+            var RemapClicked = GL.Button("Remap to texture in...");                          
             _remapMaterial = (Material) EGL.ObjectField("Target Material", _remapMaterial, typeof(Material), true);
             _autoSwitchMaterial = EGL.ToggleLeft("Switch Material after remap", _autoSwitchMaterial);
 
             if (RemapClicked)
             {
-                bool ok = TryRemmapingTo(_remapMaterial, out var tex2d, _autoSwitchMaterial);
+                bool ok = TryRemappingTo(_remapMaterial, out var tex2d, _autoSwitchMaterial);
                 if (ok && _autoSwitchMaterial)
                 {
                     if (_targetObject.TryGetComponent<Renderer>(out var r))
@@ -263,7 +263,7 @@ namespace DAPolyPaint
         }
 
 
-        private bool TryRemmapingTo(Material remapMaterial, out Texture2D tex2d, bool switchTexure = false)
+        private bool TryRemappingTo(Material remapMaterial, out Texture2D tex2d, bool switchTexure = false)
         {
             tex2d = null;
             if (_remapMaterial == null) return false;
