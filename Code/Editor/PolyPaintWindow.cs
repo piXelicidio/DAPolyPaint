@@ -269,6 +269,10 @@ namespace DAPolyPaint
                 {
                     tex2d = ToTexture2D(tex);
                     bool ok = _painter.RemapTo(tex2d, switchTexure);
+                    if (ok)
+                    {
+                        _painter.Undo_SaveState();
+                    }
                     return ok;
                 }  else return false;
             }
@@ -279,7 +283,11 @@ namespace DAPolyPaint
             EGL.Space();
             if (_painter != null)
             {
-                if (GL.Button("Full Repaint")) _painter.FullRepaint(_lastUVpick);
+                if (GL.Button("Full Repaint"))
+                {
+                    _painter.FullRepaint(_lastUVpick);
+                    _painter.Undo_SaveState();
+                }
             }
             EGL.Space();
 
