@@ -148,12 +148,16 @@ namespace DAPolyPaint
         
         void StartPaintMode()
         {
-            PrepareObject();
-            _paintingMode = true;
-            _lastPixelColor = _painter.GetTextureColor(_lastUVpick);
-            PaintEditor.SetPixelColor(_lastPixelColor);
-            SceneView.lastActiveSceneView.Repaint();
-            PaintEditor.PaintMode = true;
+            CheckComponents(_targetObject);
+            if (_targetTexture != null)
+            {
+                PrepareObject();
+                _paintingMode = true;
+                _lastPixelColor = _painter.GetTextureColor(_lastUVpick);
+                PaintEditor.SetPixelColor(_lastPixelColor);
+                SceneView.lastActiveSceneView.Repaint();
+                PaintEditor.PaintMode = true;
+            }
         }
 
         void StopPaintMode()
@@ -203,7 +207,7 @@ namespace DAPolyPaint
 
             //Big PAINT MODE button
             _scrollPos = EGL.BeginScrollView(_scrollPos);
-            using (new EditorGUI.DisabledScope(_targetMesh == null))
+            using (new EditorGUI.DisabledScope(_targetTexture == null))
             {
                 if (!_paintingMode)
                 {
@@ -1231,7 +1235,6 @@ namespace DAPolyPaint
             if (_paintingMode) return;
             
             _targetObject = Selection.activeGameObject;
-            _skinned = false;
             if (_targetObject != null)
             {
                 CheckComponents(_targetObject);
@@ -1247,6 +1250,7 @@ namespace DAPolyPaint
 
         private void CheckComponents(GameObject target)
         {
+            _skinned = false;
             var solid = target.GetComponent<MeshFilter>();
             var skinned = target.GetComponent<SkinnedMeshRenderer>();
             if (solid != null)
@@ -1266,17 +1270,14 @@ namespace DAPolyPaint
             var r = target.GetComponent<Renderer>();
             if (r != null)
             {
-                _targetTexture = r.sharedMaterial.mainTexture;
+                _targetTexture = null;
+                _textureData = null;
+                var mat = r.sharedMaterial;
+                if (mat != null) _targetTexture = mat.mainTexture;
                 if (_targetTexture != null)
                 {
                     _textureData = ToTexture2D(_targetTexture);
                 }
-                else
-                {
-                    _targetTexture = null;
-                    _textureData = null;
-                }
-
             }
             else
             {
