@@ -64,7 +64,7 @@ Mirrors the current tool cursor along a selected axis.
 
 ## Utilities
 ### Remap To Texture
-Easily switch between color palettes without disrupting your UV mapping. This feature analyzes a new texture and reassigns UVs to the most similar colors, allowing for seamless transitions between palettes and optimization across multiple models. Ideal for low-poly art creation and texture consolidation.
+Easily switch between color palettes without disrupting your model look. This feature analyzes a new texture and reassigns UVs to the most similar colors, allowing for seamless transitions between palettes and optimization across multiple models. Ideal for low-poly art creation and texture consolidation.
 
 ## Requirements and Compatibility <a name="requirements-and-compatibility"></a>
 - A mesh with a Mesh Filter or Skinned Mesh Renderer component.
