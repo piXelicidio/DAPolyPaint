@@ -151,18 +151,18 @@ namespace DAPolyPaint
         //}
     }
 
-    public class ToolType
+    public static class ToolType
     {
-        public static readonly int brush = 0;
-        public static readonly int fill = 1;
-        public static readonly int loop = 2;
-        public static readonly int pick = 3;
+        public const int brush = 0;
+        public const int fill = 1;
+        public const int loop = 2;
+        public const int pick = 3;
     }
 
-    public class FillVariant
+    public static class FillVariant
     {
-        public static readonly int flood = 0;
-        public static readonly int replace = 1;
-        public static readonly int element = 2;
+        public const int flood = 0;
+        public const int replace = 1;
+        public const int element = 2;
     }
 }

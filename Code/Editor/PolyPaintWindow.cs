@@ -308,7 +308,7 @@ namespace DAPolyPaint
             if (_currToolCode == ToolType.fill)
             {
                 _fillVariant = GL.SelectionGrid(_fillVariant, _fillVariantOptions, 3, EditorStyles.radioButton);
-            } 
+            }
             else if (_currToolCode == ToolType.brush)
             {
                 _autoQuads = EGL.ToggleLeft("Auto-detect quads", _autoQuads);
@@ -316,30 +316,35 @@ namespace DAPolyPaint
             else if (_currToolCode == ToolType.loop)
             {
                 _loopTwoWays = EGL.ToggleLeft("Two Ways", _loopTwoWays);
-            } 
+            }
             else if (_currToolCode == ToolType.pick)
-            {               
+            {
             }
             else
             {
                 EGL.Space();
             }
 
-            
+
 
             //EGL.PrefixLabel("Max quad tolerance:");
             //if (_painter!=null)  _painter.QuadTolerance = EGL.Slider(_painter.QuadTolerance, 0.1f, 360f);
-            _mirrorCursor = EGL.ToggleLeft(new GUIContent("Mirror Cursor. Axis:", ""), _mirrorCursor);            
-            PaintEditor.MirrorMode = _mirrorCursor;
-            if (_mirrorCursor)
+            if (_currToolCode != ToolType.pick)
             {
-                _currMirrorAxis = GL.Toolbar(_currMirrorAxis, _mirrorAxis);
-                _axisOffset = EGL.FloatField("Axis Offset:", _axisOffset);
-                PaintEditor.ShowMirrorPlane = EGL.ToggleLeft("Show Mirror Plane", PaintEditor.ShowMirrorPlane);
-                PaintEditor.MirrorAxis = _currMirrorAxis;
-                PaintEditor.AxisOffset = _axisOffset;
-                if (PaintEditor.ShowMirrorPlane) SceneView.lastActiveSceneView.Repaint();
+                _mirrorCursor = EGL.ToggleLeft(new GUIContent("Mirror Cursor. Axis:", ""), _mirrorCursor);
             }
+
+                PaintEditor.MirrorMode = _mirrorCursor;
+                if (_mirrorCursor)
+                {
+                    _currMirrorAxis = GL.Toolbar(_currMirrorAxis, _mirrorAxis);
+                    _axisOffset = EGL.FloatField("Axis Offset:", _axisOffset);
+                    PaintEditor.ShowMirrorPlane = EGL.ToggleLeft("Show Mirror Plane", PaintEditor.ShowMirrorPlane);
+                    PaintEditor.MirrorAxis = _currMirrorAxis;
+                    PaintEditor.AxisOffset = _axisOffset;
+                    if (PaintEditor.ShowMirrorPlane) SceneView.lastActiveSceneView.Repaint();
+                }
+            
             
             GL.EndVertical();
 
@@ -733,17 +738,7 @@ namespace DAPolyPaint
         {
             _prevFace = _lastFace;
             _prevFace_Mirror = _lastFace_Mirror;
-            (_lastFace, _lastFace_Mirror)  = GetFaceHit(sv, currMousePos, _mirrorCursor);
-           // _lastHit.
-
-            //TODO: useful but does nothing yet:
-            //if (_prevFace == -1 && _lastFace >= 0)
-            //{
-            //    OnCursorEnterObject(sv.position);
-            //} else if (_prevFace >=0 && _lastFace == -1) 
-            //{
-            //    OnCursorExitObject(sv.position);
-            //}
+            (_lastFace, _lastFace_Mirror)  = GetFaceHit(sv, currMousePos, _mirrorCursor && (_currToolCode != ToolType.pick) );      
         }
         
         //Does a face hit, return face, also mirroered face if needed.
@@ -925,12 +920,13 @@ namespace DAPolyPaint
                     break;
 
                 case EventType.KeyDown:
-                    HandleKeyDown(ev);
+                    if (ev.control && ev.keyCode == KeyCode.Z) _painter.Undo_Undo();
+                    else if (ev.control && ev.keyCode == KeyCode.Y) _painter.Undo_Redo();
+                    if (!isAllowedInput(ev)) ev.Use();
                     break;
 
                 case EventType.KeyUp:
-                    if (!isAllowedInput(ev))
-                        ev.Use();
+                    if (!isAllowedInput(ev)) ev.Use();
                     break;
             }
         }
@@ -966,22 +962,6 @@ namespace DAPolyPaint
             _isMousePressed = false;
         }
 
-        private void HandleKeyDown(Event ev)
-        {
-            if (ev.control && ev.keyCode == KeyCode.Z)
-                _painter.Undo_Undo();
-            else if (ev.control && ev.keyCode == KeyCode.Y)
-                _painter.Undo_Redo();
-
-            if (!isAllowedInput(ev))
-                ev.Use();
-        }
-
-
-        private void TryPick(RaycastHit hit)
-        {            
-            _tryPickColor = _painter.GetTextureColor(hit.textureCoord);
-        }
 
         private void HandleMouseDownLeftClick(SceneView scene, int id, Event ev, int tool)
         {
@@ -993,34 +973,28 @@ namespace DAPolyPaint
                 BuildCursor();
                 if (tool == ToolType.fill)
                 {
-                    var anyFace = _lastFace >= 0;
-                    var anyMirror = (_mirrorCursor && _lastFace_Mirror >= 0);
-                    if (anyFace || anyMirror)
-                    {
-                        if (anyFace) DoFillTool(_lastFace, _lastUVpick);
-                        if (anyMirror) DoFillTool(_lastFace_Mirror, _lastUVpick);
-                        _painter.Undo_SaveState();
-                    }
+                    ToolFillMouseDown();
                 }
                 else if (tool == ToolType.pick)
                 {
                     PickFromSurface(_lastFace);
                 }
-                else if (tool == ToolType.loop) { }
-                else PaintUsingCursor();
+                else if (tool == ToolType.brush) PaintUsingCursor();
+
                 Repaint();
             }
         }
 
-        private void DoFillTool(int face, Vector2 UV)
+        private void ToolFillMouseDown()
         {
-            if (_fillVariant == FillVariant.replace)
+            var anyFace = _lastFace >= 0;
+            var anyMirror = (_mirrorCursor && _lastFace_Mirror >= 0);
+            if (anyFace || anyMirror)
             {
-                _painter.FillReplace(face, UV);
-            } else if (_fillVariant == FillVariant.element)
-            {
-                _painter.FillElement(face, UV);
-            } else  _painter.FillPaint(face, UV);
+                if (anyFace) DoFillTool(_lastFace, _lastUVpick);
+                if (anyMirror) DoFillTool(_lastFace_Mirror, _lastUVpick);
+                _painter.Undo_SaveState();
+            }
         }
 
         private void DoMouseDrag(SceneView scene, Event ev, int tool)
@@ -1033,11 +1007,7 @@ namespace DAPolyPaint
                 {
                     if (tool == ToolType.loop)
                     {
-                        //Debug.Log(String.Format("Ctrl+drag: From {0} to {1}", _prevFace, _lastFace));
-                        BuildLoopCursor(_prevFace, _lastFace, true);
-                        if (_mirrorCursor) BuildLoopCursor(_prevFace_Mirror, _lastFace_Mirror, false);
-                        //scene.Repaint();
-                        //PaintUsingCursor();
+                        ToolLoopMouseDrag();
                     }
                     else if (tool == ToolType.pick)
                     {
@@ -1048,6 +1018,28 @@ namespace DAPolyPaint
             }
             scene.Repaint();
             this.Repaint();
+        }
+
+        private void ToolLoopMouseDrag()
+        {
+            BuildLoopCursor(_prevFace, _lastFace, true);
+            if (_mirrorCursor) BuildLoopCursor(_prevFace_Mirror, _lastFace_Mirror, false);
+        }
+
+        private void TryPick(RaycastHit hit)
+        {            
+            _tryPickColor = _painter.GetTextureColor(hit.textureCoord);
+        }
+
+        private void DoFillTool(int face, Vector2 UV)
+        {
+            if (_fillVariant == FillVariant.replace)
+            {
+                _painter.FillReplace(face, UV);
+            } else if (_fillVariant == FillVariant.element)
+            {
+                _painter.FillElement(face, UV);
+            } else  _painter.FillPaint(face, UV);
         }
 
         private bool isAllowedInput(Event ev)

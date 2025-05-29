@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using System.Security.Cryptography;
 using UnityEngine;
@@ -55,6 +56,7 @@ namespace DAPolyPaint
             _skinned = skinned;
             _textureData = texture;
             RebuildMeshForPainting();
+            
         }
 
         ///<summary>Rebuild the mesh data to get ready for painting.</summary>
