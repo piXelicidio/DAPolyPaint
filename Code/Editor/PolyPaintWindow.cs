@@ -905,89 +905,85 @@ namespace DAPolyPaint
         }
 
         private void ProcessSceneEvents(SceneView scene, int id, Event ev)
-        {          
-            
-            //When the mouse is moving while the left click is pressed
-            if (ev.type == EventType.MouseDrag)
+        {
+            switch (ev.type)
             {
-                DoMouseDrag(scene, ev, _currToolCode);
-            }
-            //When the mouse is moving freely around
-            else if (ev.type == EventType.MouseMove)
-            {
-                DoFaceHit(scene, ev.mousePosition);
-                if (_currToolCode == ToolType.pick)
-                {
-                    if (_lastFace != -1)
-                    {
-                        TryPick(_lastHit);
-                        Repaint();
-                    }
-                }
-                if (_lastFace != _prevFace)
-                {
-                    BuildCursor();
-                }
-                scene.Repaint();
-            }
-            //When the mouse click is pressed down
-            else if (ev.type == EventType.MouseDown)
-            {
-                if (ev.button == 0)
-                {
-                    DoMouseDownLeftClick(scene, id, ev, _currToolCode);
-                }
-            }
-            //When the mouse click is released
-            else if (ev.type == EventType.MouseUp)
-            {
-                if (ev.button == 0)
-                {
-                    if (_currToolCode == ToolType.loop)
-                    {
-                        PaintUsingCursor();
-                        _painter.Undo_SaveState();
-                    }
-                    else if (_currToolCode == ToolType.brush)
-                    {
-                        _painter.Undo_SaveState();
-                    }
-                    ReleaseInput(ev);
-                    _isMousePressed = false;
-                }
-            }
-            //when a key is pressed down
-            else if (ev.type == EventType.KeyDown)
-            {
-                if (ev.control)
-                {
-                    if (ev.keyCode == KeyCode.Z)
-                    {
-                        //catching Ctrl+Z
-                        //Debug.Log("Ctrl+Z: Undo");
-                        _painter.Undo_Undo();
-                    }
-                    else if (ev.keyCode == KeyCode.Y)
-                    {
-                        //Debug.Log("Ctrl+Y: Redo");
-                        _painter.Undo_Redo();
-                    }
-                }
-                if (!isAllowedInput(ev)) { ev.Use(); }
-            }
-            //when a key is released
-            else if (ev.type == EventType.KeyUp)
-            {
-                if (!isAllowedInput(ev)) { ev.Use(); }
+                case EventType.MouseDrag:
+                    DoMouseDrag(scene, ev, _currToolCode);
+                    break;
+
+                case EventType.MouseMove:
+                    HandleMouseMove(scene, ev);
+                    break;
+
+                case EventType.MouseDown when ev.button == 0:
+                    HandleMouseDownLeftClick(scene, id, ev, _currToolCode);
+                    break;
+
+                case EventType.MouseUp when ev.button == 0:
+                    HandleMouseUp(ev);
+                    break;
+
+                case EventType.KeyDown:
+                    HandleKeyDown(ev);
+                    break;
+
+                case EventType.KeyUp:
+                    if (!isAllowedInput(ev))
+                        ev.Use();
+                    break;
             }
         }
+
+        private void HandleMouseMove(SceneView scene, Event ev)
+        {
+            DoFaceHit(scene, ev.mousePosition);
+
+            if (_currToolCode == ToolType.pick && _lastFace != -1)
+            {
+                TryPick(_lastHit);
+                Repaint();
+            }
+
+            if (_lastFace != _prevFace)
+                BuildCursor();
+
+            scene.Repaint();
+        }
+
+        private void HandleMouseUp(Event ev)
+        {
+            // both loop and brush need to save
+            if (_currToolCode == ToolType.loop || _currToolCode == ToolType.brush)
+            {
+                if (_currToolCode == ToolType.loop)
+                    PaintUsingCursor();
+
+                _painter.Undo_SaveState();
+            }
+
+            ReleaseInput(ev);
+            _isMousePressed = false;
+        }
+
+        private void HandleKeyDown(Event ev)
+        {
+            if (ev.control && ev.keyCode == KeyCode.Z)
+                _painter.Undo_Undo();
+            else if (ev.control && ev.keyCode == KeyCode.Y)
+                _painter.Undo_Redo();
+
+            if (!isAllowedInput(ev))
+                ev.Use();
+        }
+
 
         private void TryPick(RaycastHit hit)
         {            
             _tryPickColor = _painter.GetTextureColor(hit.textureCoord);
         }
 
-        private void DoMouseDownLeftClick(SceneView scene, int id, Event ev, int tool)
+        private void HandleMouseDownLeftClick(SceneView scene, int id, Event ev, int tool)
         {
             AcquireInput(ev, id);
             _isMousePressed = true;
