@@ -167,5 +167,16 @@ namespace DAPolyPaint
         public const int element = 2;
     }
 
+    public static class Temp
+    {
+        private static GUIContent _content = new GUIContent("", "");
+        public static GUIContent Content(string text, string tooltip)
+        {
+            _content.text = text;
+            _content.tooltip = tooltip;
+            return _content;
+        }
+    }
+
 
 }

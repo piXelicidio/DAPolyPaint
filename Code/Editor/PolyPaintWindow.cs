@@ -3,11 +3,11 @@ using UnityEngine;
 using UnityEditor;
 using EGL = UnityEditor.EditorGUILayout;
 using GL = UnityEngine.GUILayout;
+using EGU = UnityEditor.EditorGUIUtility;
 using System;
 using System.IO;
 using System.Text.RegularExpressions;
-using static UnityEngine.GraphicsBuffer;
-using UnityEngine.SceneManagement;
+
 
 namespace DAPolyPaint 
 {
@@ -57,9 +57,14 @@ namespace DAPolyPaint
         int _currMirrorAxis;
         float _axisOffset;
         readonly string[] _toolNames = new string[] { "Brush", "Fill", "Loop", "Pick" };
+        readonly GUIContent[] _toolNames_row1 = {
+            new GUIContent("Brush", ""), 
+            new GUIContent("Fill", "Ctrl"), 
+            new GUIContent("Loop", "Ctrl+Shift"), 
+            new GUIContent("Pick","Shift") 
+        };
         readonly string[] _mirrorAxis = new string[] { "X", "Y", "Z" };
-        readonly string[] _toolHints = new string[]
-        {
+        readonly string[] _toolHints = new string[] {
             "Click or Drag over faces", //brush
             "Click a starting face", //fill
             "Drag over a quad edge", //loop
@@ -255,19 +260,33 @@ namespace DAPolyPaint
             OnGUI_ObjectStatus();
             OnGUI_TexturePalette();
 
-            var content = new GUIContent("Auto-Shaded Wireframe", "Set Shaded Wrieframe and Camera lighting on Paint Mode");
-            _autoShadedWireframe = EGL.ToggleLeft(content, _autoShadedWireframe);
+            _autoShadedWireframe = EGL.ToggleLeft(Temp.Content("Auto-Shaded Wireframe", "Set Shaded Wrieframe and Camera lighting on Paint Mode"), _autoShadedWireframe);
 
             //Painting tools
             using (new EditorGUI.DisabledScope(!_paintingMode))
             {
                 OnGUI_PaintingTools();
+                OnGUI_UndoRedo();
                 OnGUI_SavePaintedMesh();
                 OnGUI_Remapping();                
             }
 
             EGL.EndScrollView();
 
+        }
+
+        private void OnGUI_UndoRedo()
+        {
+            EGL.BeginHorizontal();
+            if (GL.Button(Temp.Content("Undo", "Ctrl+Z")))
+            { 
+                _painter.Undo_Undo();                
+            }
+            if (GL.Button(Temp.Content("Redo", "Ctrl+Y")))
+            {
+                _painter.Undo_Redo();
+            }
+            EGL.EndHorizontal();
         }
 
         private void OnGUI_Remapping()
@@ -333,7 +352,7 @@ namespace DAPolyPaint
             GL.BeginVertical(EditorStyles.textArea);
             //TODO: toolbar selected parameter can be set to -1 to unselect all buttons.
             //TOOLBAR of: Brush, Fill, Loop, Pick
-            _currToolCode = GL.Toolbar(_currToolCode, _toolNames);
+            _currToolCode = GL.Toolbar(_currToolCode, _toolNames_row1);
             if (_currToolCode >= 0 && _currToolCode <= _toolNames.Length)
             {
                 EGL.LabelField(_toolHints[_currToolCode], EditorStyles.miniLabel);
@@ -364,7 +383,7 @@ namespace DAPolyPaint
             //if (_painter!=null)  _painter.QuadTolerance = EGL.Slider(_painter.QuadTolerance, 0.1f, 360f);
             if (_currToolCode != ToolType.pick)
             {
-                _mirrorCursor = EGL.ToggleLeft(new GUIContent("Mirror Cursor. Axis:", ""), _mirrorCursor);
+                _mirrorCursor = EGL.ToggleLeft(Temp.Content("Mirror Cursor. Axis:", ""), _mirrorCursor);
             }
 
                 PaintEditor.MirrorMode = _mirrorCursor;
@@ -418,29 +437,29 @@ namespace DAPolyPaint
             //saving mesh test
             EGL.Space();
             _autoSave = EGL.ToggleLeft("Auto-save at the end of the session", _autoSave);
+
             EGL.BeginHorizontal();
-            using (new EditorGUI.DisabledScope(_autoSave))
-            {                
-                if (GL.Button(new GUIContent("Save", "Save the modified painted mesh")))
+                         
+                if (GL.Button(Temp.Content("Save", "Save the modified painted mesh")))
                 {
                     if (SaveMeshAsset(false, false))
                     {
                         _painter.Undo_Reset();
                     };
                 }
-                if (GL.Button(new GUIContent("Save As...", "Save the modified painted mesh")))
+            if (GL.Button(Temp.Content( "Save As...", "Save the modified painted mesh")))
                 {
                     if (SaveMeshAsset(false, true))
                     {
                         _painter.Undo_Reset();
                     };
                 }
-                if (GL.Button(new GUIContent("Discard!", "Restore to the start of current session")))
+                if (GL.Button(Temp.Content("Discard!", "Restore to the start of current session")))
                 {
                     _painter.RestoreOldMesh();
                     SetPaintingMode(false);
                 }
-            }
+           
             EGL.EndHorizontal();
         }
         
@@ -596,7 +615,7 @@ namespace DAPolyPaint
         {
             if (_targetTexture)
             {
-                var texWidth = EditorGUIUtility.currentViewWidth;
+                var texWidth = EGU.currentViewWidth;
 
                 var rt = EGL.GetControlRect(false, texWidth);
                 rt.height = rt.width;
@@ -626,7 +645,7 @@ namespace DAPolyPaint
                 }
 
                 //current colors
-                var cRect = EGL.GetControlRect(false, EditorGUIUtility.singleLineHeight);
+                var cRect = EGL.GetControlRect(false, EGU.singleLineHeight);
                 if (_currToolCode == ToolType.pick && _lastFace != -1)
                 {
                     cRect.width = cRect.width / 2;
@@ -759,14 +778,14 @@ namespace DAPolyPaint
         {
             GUIUtility.hotControl = id;
             e.Use();
-            EditorGUIUtility.SetWantsMouseJumping(1);
+            EGU.SetWantsMouseJumping(1);
         }
 
         void ReleaseInput(Event e)
         {
             GUIUtility.hotControl = 0;
             e.Use();
-            EditorGUIUtility.SetWantsMouseJumping(0);
+            EGU.SetWantsMouseJumping(0);
         }
 
         /// <summary>
@@ -888,9 +907,9 @@ namespace DAPolyPaint
 
             //label
             rt.width = 200;
-            rt.height = EditorGUIUtility.singleLineHeight;
+            rt.height = EGU.singleLineHeight;
             rt.x = border * 2;
-            rt.y = height - EditorGUIUtility.singleLineHeight - border * 2;
+            rt.y = height - EGU.singleLineHeight - border * 2;
             var style = new GUIStyle(EditorStyles.label);
             style.fontSize += 2;
             style.normal.textColor = Color.black;
@@ -906,8 +925,6 @@ namespace DAPolyPaint
         {
             if (_paintingMode)
             {
-
-
                 //input events
                 int id = GUIUtility.GetControlID(0xDA3D, FocusType.Passive);
                 var ev = Event.current;
