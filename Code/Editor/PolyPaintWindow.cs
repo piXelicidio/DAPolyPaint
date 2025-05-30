@@ -213,28 +213,14 @@ namespace DAPolyPaint
             {
                 SaveMeshAsset();
             }
-            //else if (_painter.isModified())
-            //{
-            //    var apply = EditorUtility.DisplayDialog("Apply changes?",
-            //        "Apply all changes from this paint session?", "Ok", "Discard");
-            //    if (!apply)
-            //    {
-            //        _painter.RestoreOldMesh();
-            //    }
-            //    else
-            //    {
-            //        if (!SaveMeshAsset())
-            //        {
-            //            _painter.RestoreOldMesh();
-            //        };
-            //    }
 
-            //}
             SetPaintingMode(false);
             //DestroyImmediate(_dummyObject);
         }
                 
-        //Editor Window User Interface - PolyPaint --------------------------------
+        /// <summary>
+        /// Editor Window User Interface - PolyPaint
+        /// </summary>
         void OnGUI()
         {
             //processing input events when the window is focused
@@ -314,7 +300,10 @@ namespace DAPolyPaint
             GL.EndVertical();
         }
 
-
+        /// <summary>
+        /// Attempts to remap the mesh's current UVs (representing colors from the old texture)
+        /// to the nearest matching colors on the new texture.
+        /// </summary>
         private bool TryRemappingTo(Material remapMaterial, out Texture2D tex2d, bool switchTexure = false)
         {
             tex2d = null;
@@ -335,6 +324,9 @@ namespace DAPolyPaint
             }
         }
 
+        /// <summary>
+        /// Renders the GUI section for painting tools, and associated tool-specific settings        
+        /// </summary>
         private void OnGUI_PaintingTools()
         {
             EGL.Space();
@@ -479,7 +471,10 @@ namespace DAPolyPaint
         }
 
 
-        //Try to apply the changes to the mesh, return false if the process is aborted.
+        /// <summary>
+        /// Saves the modified mesh data to an asset file. It can either overwrite the original mesh asset
+        /// or create a new mesh asset, reassigning it to the target GameObject's MeshFilter or SkinnedMeshRenderer.
+        /// </summary>
         public bool SaveMeshAsset(bool optimizeMesh = false, bool forceNewFileName = false)
         {
             var currentMeshFile = AssetDatabase.GetAssetPath(_targetMesh);
@@ -564,6 +559,7 @@ namespace DAPolyPaint
             }
         }
 
+        //TODO: feeling unused, might delete later
         public Mesh SaveMeshToFile(Mesh mesh, string fileName, bool createNewInstance = false, bool optimizeMesh = false, bool nameIsFullPath = false)
         {
             string filePath = fileName;
@@ -611,6 +607,11 @@ namespace DAPolyPaint
             _currToolCode = index;
         }
 
+        /// <summary>
+        /// Renders the GUI section displaying the current color palette texture.
+        /// It allows the user to select a color by clicking or dragging on the texture
+        /// and displays the currently picked color.
+        /// </summary>
         private void OnGUI_TexturePalette()
         {
             if (_targetTexture)
@@ -661,7 +662,10 @@ namespace DAPolyPaint
         }
 
 
-
+        /// <summary>
+        /// Renders the GUI section displaying the selected object's readiness for painting,
+        /// including a color-coded status bar and a foldout with detailed information or warnings.
+        /// </summary>
         private void OnGUI_ObjectStatus()
         {
             var check = CheckObject();
@@ -699,6 +703,9 @@ namespace DAPolyPaint
             EGL.EndFoldoutHeaderGroup();
         }
 
+        /// <summary>
+        /// Checks the selected GameObject's readiness for painting and returns detailed status information.
+        /// </summary>
         private (bool isOk, string info) CheckObject()
         {
             var info = "";
@@ -741,7 +748,9 @@ namespace DAPolyPaint
         }
 
 
-
+        /// <summary>
+        /// Draws a cross shape on the Editor GUI at a specified position with a given color and size.
+        /// </summary>
         void EditorGUIDrawCross(in Vector2 cur, in Color c, int size = 3, int space = 3)
         {
             var rt = new Rect();
@@ -797,8 +806,11 @@ namespace DAPolyPaint
             _prevFace_Mirror = _lastFace_Mirror;
             (_lastFace, _lastFace_Mirror)  = GetFaceHit(sv, currMousePos, _mirrorCursor && (_currToolCode != ToolType.pick) );      
         }
-        
-        //Does a face hit, return face, also mirroered face if needed.
+
+        /// <summary>
+        /// Performs a raycast from the mouse position in the Scene View to identify the hit mesh face.
+        /// Optionally, it also performs a mirrored raycast to find a corresponding mirrored face.
+        /// </summary>
         (int,int) GetFaceHit(SceneView sv, Vector2 currMousePos, bool mirrorHit = false)
         {
             int result = -1;
@@ -887,6 +899,9 @@ namespace DAPolyPaint
             }
         }
 
+        /// <summary>
+        /// Draws a colored border and a text label around the Scene View window.
+        /// </summary>
         void EditorGUIDrawFrame(string label, int border = 2)
         {
             var width = Camera.current.pixelWidth;
@@ -1134,6 +1149,9 @@ namespace DAPolyPaint
             }
         }
 
+        /// <summary>
+        /// Populates a list with the vertex positions of a specified mesh face.
+        /// </summary>
         public void GetFaceVerts(int face, List<Vector3> verts)
         {
             verts.Clear();
@@ -1154,6 +1172,10 @@ namespace DAPolyPaint
             }
         }
 
+        /// <summary>
+        /// Populates a list with the world-space vertex positions of a specified mesh face,
+        /// applying a given transformation matrix.
+        /// </summary>
         public void GetFaceVerts(int face, List<Vector3> verts, Matrix4x4 transformMat)
         {
             verts.Clear();
@@ -1174,6 +1196,13 @@ namespace DAPolyPaint
             }
         }
 
+        /// <summary>
+        /// Identifies a continuous loop of quads starting from the shared edge of two input faces.
+        /// It then prepares their world-space vertices for rendering as the Scene View painting cursor.
+        /// </summary>
+        /// <remarks>
+        /// Why: To visually show the user the faces that will be affected by the loop painting tool.
+        /// </remarks>
         private void BuildLoopCursor(int fromFace, int toFace, bool clearPolyCursor)
         {
             var loop = _painter.FindLoop(fromFace, toFace);
@@ -1291,6 +1320,10 @@ namespace DAPolyPaint
             Repaint();
         }
 
+        /// <summary>
+        /// Examines the provided GameObject to identify its mesh (static or skinned) and material texture,
+        /// storing references to these components for use by the painting tool.
+        /// </summary>
         private void CheckComponents(GameObject target)
         {
             _skinned = false;
@@ -1329,6 +1362,11 @@ namespace DAPolyPaint
             }
         }
 
+        /// <summary>
+        /// Initializes the painting session by setting up internal data structures,
+        /// creating a hidden mesh collider for raycasting, and configuring the painter with the target mesh data.
+        /// For skinned meshes, it bakes a snapshot to support deformations.
+        /// </summary>
         void PrepareObject()
         {
             if (_targetMesh != null)
@@ -1363,7 +1401,9 @@ namespace DAPolyPaint
             }
         }
 
-        //Creates a dummy object to be used as a raycast target
+        /// <summary>
+        /// Creates a dummy object to be used as a raycast target
+        /// </summary>
         (GameObject, MeshCollider) GetDummy(GameObject obj)
         {
             //see first if obj already have a child with DummyName
@@ -1405,6 +1445,10 @@ namespace DAPolyPaint
             Debug.Log(s);
         }
 
+        /// <summary>
+        /// Converts any Unity Texture object into a readable Texture2D,
+        /// enabling pixel data access for color sampling.
+        /// </summary>
         Texture2D ToTexture2D(Texture tex)
         {
             var texture2D = new Texture2D(tex.width, tex.height, TextureFormat.RGBA32, false);
