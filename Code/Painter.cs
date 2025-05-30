@@ -1,8 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.ComponentModel;
-using System.Linq;
-using System.Security.Cryptography;
 using UnityEngine;
 
  
@@ -10,6 +7,7 @@ namespace DAPolyPaint
 {
     /// <summary>
     /// Deals with Mesh and UV painting functions. Can be used in play mode.
+    /// It prepares mesh data, applies UV-based colors to faces, handles topological relationships.
     /// </summary>
     //Doesn't know anything about UI or GameObjects. 
     //Many field/variable names are selected based on the 3ds Max Poly Paint tool implementation
@@ -59,7 +57,10 @@ namespace DAPolyPaint
             
         }
 
-        ///<summary>Rebuild the mesh data to get ready for painting.</summary>
+        /// <summary>
+        /// Transforms the input mesh into an internal, per-face representation optimized for UV painting,
+        /// and builds all necessary topological data structures (e.g., face graph, indexed vertices).
+        /// </summary>
         void RebuildMeshForPainting()
         {
             var t = Environment.TickCount;
@@ -148,8 +149,10 @@ namespace DAPolyPaint
         }
 
 
-
-        ///<summary>Defines a new indexed view of the mesh, optimized like it was on modeling software source.</summary>
+        /// <summary>
+        /// Creates an optimized, indexed view of the mesh's vertices and faces,
+        /// mapping original (un-indexed) vertices to unique shared vertex indices for topological operations.
+        /// </summary>        
         //Needed for geting relationships between faces, edges, verts.
         //_indexedVerts store unique vertices
         //_indexedFaces every 3 values are 3 indexes pointing to _indexedVerts values.
@@ -308,6 +311,10 @@ namespace DAPolyPaint
             }
         }
 
+        /// <summary>
+        /// Calculates the angle at each vertex corner for every triangle in the indexed mesh,
+        /// used primarily for quad detection algorithms.
+        /// </summary>
         private void CalcAngles()
         {
             _angles = new float[_indexedFaces.Length];
@@ -335,10 +342,10 @@ namespace DAPolyPaint
             };
         }
 
-        ///<summary> 
-        ///Ggiven unsoreted position p1 p2 (0..2) in a triangle. 
-        ///Return which side number of the triangle it represents.
-        ///</summary>                
+        /// <summary>
+        /// Maps a pair of local vertex indices (0-2) from a triangle to a unique integer
+        /// representing one of the triangle's three sides (0, 1, or 2).
+        /// </summary>           
         private int GetTriangleSide(int p1, int p2)
         {
             var low = Math.Min(p1, p2);
@@ -352,8 +359,13 @@ namespace DAPolyPaint
             }
         }
 
-        /// <summary> build link relatioships between faces </summary>
-        //assumes Indexify() was called before
+        /// <summary>
+        /// Builds a graph of relationships between adjacent faces in the mesh,
+        /// identifying shared edges and storing connection details in FaceLink objects.
+        /// </summary>
+        /// <remarks>
+        /// assumes Indexify() was called before
+        /// </remarks>
         private void BuildFaceGraph()
         {
             void FindCoincidences(int face1, int face2)
@@ -474,8 +486,10 @@ namespace DAPolyPaint
 
 
         /// <summary>
-        /// Finds the best neighbor face to complete a quad.
+        /// Finds the adjacent face that, when combined with the input face, forms a quad,
+        /// based on angle proximity to 90 degrees.
         /// </summary>
+        /// <returns>The index of the detected quad-brother face, or -1 if not found.</returns>
         /// <param name="face"></param>
         /// <param name="tolerance"></param>
         /// <returns>Face index or -1 if not found.</returns>
@@ -560,7 +574,10 @@ namespace DAPolyPaint
             return _faceLinks[face];
         }
 
-
+        /// <summary>
+        /// Fills a contiguous region of faces with a specified UV color,
+        /// either by matching the starting face's original color or by simply filling all connected faces.
+        /// </summary>
         public void FillPaint(int startFace, Vector2 uvc, bool DontCheckColor = false)
         {
             var bk_pixelColor = GetTextureColor(GetUV(startFace));
@@ -642,7 +659,7 @@ namespace DAPolyPaint
         }
 
         /// <summary>
-        /// Given two adjacent faces (f1 and f2), find a loop.
+        /// Identifies a continuous loop of quads (pairs of adjacent faces) starting from the shared edge of two input faces.
         /// </summary>
         public HashSet<int> FindLoop(int f1, int f2)
         {
@@ -756,6 +773,9 @@ namespace DAPolyPaint
             return _undoPos > 0;
         }
 
+        /// <summary>
+        /// Paints all faces in the mesh that currently have the same color as the specified starting face with the new UV color.
+        /// </summary>
         public void FillReplace(int face, Vector2 UV)
         {
             //Debug.Log("Replacing...");
@@ -773,6 +793,9 @@ namespace DAPolyPaint
             }
         }
 
+        /// <summary>
+        /// Paints all connected faces of a mesh element with the new UV color, regardless of their current color.
+        /// </summary>
         public void FillElement(int face, Vector2 UV)
         {
             FillPaint(face, UV, true);
@@ -786,6 +809,10 @@ namespace DAPolyPaint
             }
         };
 
+        /// <summary>
+        /// Reassigns the UVs of all mesh faces by finding the closest color match on a new target texture,
+        /// effectively remapping the painted model to a different color palette.
+        /// </summary>
         public bool RemapTo(Texture2D tex2d, bool switchTexture = false)
         {
             var pixels = tex2d.GetPixelData<Color32>(0);
@@ -898,6 +925,10 @@ namespace DAPolyPaint
         }
     }
 
+    /// <summary>
+    /// A utility class for creating and restoring a copy of a Unity Mesh's essential data.
+    /// Used for undo/redo functionality for the entire mesh structure.
+    /// </summary>
     public class MeshCopy
     {
         public int[] tris;
@@ -930,9 +961,9 @@ namespace DAPolyPaint
         }
     }
 
-    
+
     /// <summary>
-    /// Stores the link relationship between two adjacent faces.
+    /// Stores the topological relationship between two adjacent faces in the mesh.
     /// </summary>
     public class FaceLink
     {
@@ -943,7 +974,10 @@ namespace DAPolyPaint
         public int pOut;            //the vertice point that is not shared.
         public int backLinkIdx;     //position index on the other face List of links corresponding to this link O.o capichi      
     }
-
+    
+    /// <summary>
+    /// Stores an array of FaceLink objects for a single face, providing direct access to its links by triangle side.
+    /// </summary>
     public class FaceData
     {
         public FaceLink[] links;        
@@ -954,6 +988,10 @@ namespace DAPolyPaint
         }
     }
 
+    /// <summary>
+    /// Represents an edge in the mesh defined by two vertex indices.
+    /// Provides methods for checking equality and shared vertices between edges.
+    /// </summary>
     public struct Edge
     {
         public int v1, v2;
