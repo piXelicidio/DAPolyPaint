@@ -76,6 +76,9 @@ namespace DAPolyPaint
         public readonly Color ColorStatusPainting = new Color(1, 0.4f, 0);//orange
         public readonly Color ColorStatusError = Color.red;
         private bool _autoSwitchMaterial = true;
+        private bool _autoShadedWireframe = true;
+        private SceneView.CameraMode _savedSceneViewCameraMode;
+        private bool _savedSceneLighting;
         #endregion
 
         //---------------------------------------------------------------------------------------------
@@ -132,7 +135,7 @@ namespace DAPolyPaint
         public void OnBeforeAssemblyReload()
         {
             Debug.Log("Assembly Reloading...");
-            AbortPaintMode();
+            SetPaintingMode(false);
         }
 
         public void OnAfterAssemblyReload()
@@ -151,6 +154,14 @@ namespace DAPolyPaint
             CheckComponents(_targetObject);
             if (_targetTexture != null)
             {
+                SetPaintingMode(true);
+            }
+        }
+
+        private void SetPaintingMode(bool enable)
+        {
+            if (enable)
+            {
                 PrepareObject();
                 _paintingMode = true;
                 _lastPixelColor = _painter.GetTextureColor(_lastUVpick);
@@ -158,6 +169,37 @@ namespace DAPolyPaint
                 SceneView.lastActiveSceneView.Repaint();
                 PaintEditor.PaintMode = true;
             }
+            else
+            {
+                _paintingMode = false;
+                SceneView.lastActiveSceneView.Repaint();
+                PaintEditor.PaintMode = false;
+                _paintCursor.enabled = false;
+            }
+            SetShadedWireframe(enable);
+        }
+
+        private void SetShadedWireframe(bool enable)
+        {
+            if (_autoShadedWireframe)
+            {
+                var sv = SceneView.lastActiveSceneView;
+                if (sv == null) return;
+                if (enable)
+                {                   
+                    _savedSceneViewCameraMode = sv.cameraMode;
+                    _savedSceneLighting = sv.sceneLighting;
+                    sv.cameraMode = SceneView.GetBuiltinCameraMode(DrawCameraMode.TexturedWire);
+                    sv.sceneLighting = false;
+                    sv.Repaint();
+                }
+                else
+                {
+                    sv.cameraMode = _savedSceneViewCameraMode;
+                    sv.sceneLighting = _savedSceneLighting;
+                    sv.Repaint();
+                }
+            } 
         }
 
         void StopPaintMode()
@@ -166,39 +208,27 @@ namespace DAPolyPaint
             {
                 SaveMeshAsset();
             }
-            else if (_painter.isModified())
-            {
-                var apply = EditorUtility.DisplayDialog("Apply changes?",
-                    "Apply all changes from this paint session?", "Ok", "Discard");
-                if (!apply)
-                {
-                    _painter.RestoreOldMesh();
-                }
-                else
-                {
-                    if (!SaveMeshAsset())
-                    {
-                        _painter.RestoreOldMesh();
-                    };
-                }
+            //else if (_painter.isModified())
+            //{
+            //    var apply = EditorUtility.DisplayDialog("Apply changes?",
+            //        "Apply all changes from this paint session?", "Ok", "Discard");
+            //    if (!apply)
+            //    {
+            //        _painter.RestoreOldMesh();
+            //    }
+            //    else
+            //    {
+            //        if (!SaveMeshAsset())
+            //        {
+            //            _painter.RestoreOldMesh();
+            //        };
+            //    }
 
-            }
-            _paintingMode = false;
-            SceneView.lastActiveSceneView.Repaint();
-            PaintEditor.PaintMode = false;
-            _paintCursor.enabled = false;
+            //}
+            SetPaintingMode(false);
             //DestroyImmediate(_dummyObject);
         }
-
-        void AbortPaintMode()
-        {
-            //_painter.RestoreOldMesh();
-            _paintingMode = false;
-            SceneView.lastActiveSceneView.Repaint();
-            PaintEditor.PaintMode = false;
-            _paintCursor.enabled = false;
-        }
-
+                
         //Editor Window User Interface - PolyPaint --------------------------------
         void OnGUI()
         {
@@ -217,13 +247,16 @@ namespace DAPolyPaint
                 {
                     var oldColor = GUI.backgroundColor;
                     GUI.backgroundColor = ColorStatusPainting;
-                    if (GL.Button("END SESSION")) StopPaintMode();
+                    if (GL.Button("END SESSION")) StopPaintMode();                    
                     GUI.backgroundColor = oldColor;                   
                 }
             }
 
             OnGUI_ObjectStatus();
             OnGUI_TexturePalette();
+
+            var content = new GUIContent("Auto-Shaded Wireframe", "Set Shaded Wrieframe and Camera lighting on Paint Mode");
+            _autoShadedWireframe = EGL.ToggleLeft(content, _autoShadedWireframe);
 
             //Painting tools
             using (new EditorGUI.DisabledScope(!_paintingMode))
@@ -401,7 +434,12 @@ namespace DAPolyPaint
                     {
                         _painter.Undo_Reset();
                     };
-                }               
+                }
+                if (GL.Button(new GUIContent("Discard!", "Restore to the start of current session")))
+                {
+                    _painter.RestoreOldMesh();
+                    SetPaintingMode(false);
+                }
             }
             EGL.EndHorizontal();
         }
