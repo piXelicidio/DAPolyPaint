@@ -49,13 +49,7 @@ namespace DAPolyPaint
 
 
         #region --------- User Interface ---------
-        bool _objectInfoFoldout = true;
         const string WindowName = "DAPolyPaint";
-        bool _autoQuads = true;
-        bool _loopTwoWays = true;
-        bool _mirrorCursor = false;
-        int _currMirrorAxis;
-        float _axisOffset;
         readonly GUIContent[] _toolNames_row1 = {
             new GUIContent("Brush", "Draw face by face"), 
             new GUIContent("Fill", "Fill areas (Shortcut: Ctrl)"), 
@@ -70,21 +64,63 @@ namespace DAPolyPaint
             "Click a face to get color (Shortcut: Shift)" //pick
         };
         int _currToolCode = 0;        
-        int _fillVariant;
         readonly string[] _fillVariantOptions = new string[] { "Flood", "Replace", "Element", "ALL" };
         bool _anyModifiers = false;
         int _savedTool;
-        bool _autoSave = false;
         const float _statusColorBarHeight = 3;
         public readonly Color ColorStatusReady = Color.green;
         public readonly Color ColorStatusPainting = new Color(1, 0.4f, 0);//orange
         public readonly Color ColorStatusError = Color.red;
-        private bool _autoSwitchMaterial = true;
-        private bool _autoShadedWireframe = true;
-        private SceneView.CameraMode _savedSceneViewCameraMode;
-        private bool _savedSceneLighting;
-        private bool _savedSceneViewDrawGizmos;
-        private bool _toolsFoldedOut = true;
+        private UIState _ui;
+
+        private struct UIState
+        {
+            public bool ObjectInfoFoldout;
+            public bool AutoQuads;
+            public bool LoopTwoWays;
+            public bool MirrorCursor;
+            public int CurrMirrorAxis;
+            public float AxisOffset;
+            public int FillVariant; // _fillVariant from PolyPaintWindow
+            public bool AutoSave;
+            public bool AutoSwitchMaterial;
+            public bool AutoShadedWireframe;
+            public bool ToolsFoldedOut;
+            public SceneView.CameraMode SavedSceneViewCameraMode;
+            public bool SavedSceneLighting;
+            public bool SavedSceneViewDrawGizmos;
+            public int ToolAction;
+
+            public void Load(string windowNamePrefix)
+            {
+                ObjectInfoFoldout = EditorPrefs.GetBool(windowNamePrefix + "_objectInfoFoldout", true);
+
+                FillVariant = EditorPrefs.GetInt(windowNamePrefix + "_fillVariant", 0);
+                AutoQuads = EditorPrefs.GetBool(windowNamePrefix + "_autoQuads", true);
+                CurrMirrorAxis = EditorPrefs.GetInt(windowNamePrefix + "_mirrorAxis", 0);
+                AxisOffset = EditorPrefs.GetFloat(windowNamePrefix + "_axisOffset", 0);
+                LoopTwoWays = EditorPrefs.GetBool(windowNamePrefix + "_loopTwoWays", true);
+                AutoSave = EditorPrefs.GetBool(windowNamePrefix + "_autoSave", false); 
+                AutoSwitchMaterial = EditorPrefs.GetBool(windowNamePrefix + "_autoSwitchMaterial", true);
+                AutoShadedWireframe = EditorPrefs.GetBool(windowNamePrefix + "_autoShadedWireframe", true);
+                ToolsFoldedOut = EditorPrefs.GetBool(windowNamePrefix + "_toolsFoldedOut", true);
+            }
+
+            public void Save(string windowNamePrefix)
+            {
+                EditorPrefs.SetBool(windowNamePrefix + "_objectInfoFoldout", ObjectInfoFoldout);
+                EditorPrefs.SetInt(windowNamePrefix + "_fillVariant", FillVariant);
+                EditorPrefs.SetBool(windowNamePrefix + "_autoQuads", AutoQuads);
+                EditorPrefs.SetInt(windowNamePrefix + "_mirrorAxis", CurrMirrorAxis);
+                EditorPrefs.SetFloat(windowNamePrefix + "_axisOffset", AxisOffset);
+                EditorPrefs.SetBool(windowNamePrefix + "_loopTwoWays", LoopTwoWays);
+                EditorPrefs.SetBool(windowNamePrefix + "_autoSave", AutoSave);
+                EditorPrefs.SetBool(windowNamePrefix + "_autoSwitchMaterial", AutoSwitchMaterial);
+                EditorPrefs.SetBool(windowNamePrefix + "_autoShadedWireframe", AutoShadedWireframe);
+                EditorPrefs.SetBool(windowNamePrefix + "_toolsFoldedOut", ToolsFoldedOut);
+            }
+        }
+
         #endregion
 
         //---------------------------------------------------------------------------------------------
@@ -107,17 +143,11 @@ namespace DAPolyPaint
             SceneView.duringSceneGui += OnSceneGUI;
             AssemblyReloadEvents.beforeAssemblyReload += OnBeforeAssemblyReload;
             AssemblyReloadEvents.afterAssemblyReload += OnAfterAssemblyReload;
-
-            _objectInfoFoldout = EditorPrefs.GetBool(WindowName+"_objectInfoFoldout", true);
+            _ui.Load(WindowName);           
+            PaintCursorDrawer.ShowMirrorPlane = EditorPrefs.GetBool(WindowName + "ShowMirrorPlane", true);
             _lastUVpick.x = EditorPrefs.GetFloat(WindowName + "_lastUVpick.x", 0.5f);
             _lastUVpick.y = EditorPrefs.GetFloat(WindowName + "_lastUVpick.y", 0.5f);
-            //SetCurrTool(EditorPrefs.GetInt(WindowName + "_currToolCode", 0));
-            _fillVariant = EditorPrefs.GetInt(WindowName + "_fillVariant", 0);
-            _autoQuads = EditorPrefs.GetBool(WindowName + "_autoQuads", true);
-            _currMirrorAxis = EditorPrefs.GetInt(WindowName + "_mirrorAxis", 0);
-            _axisOffset = EditorPrefs.GetFloat(WindowName + "_axisOffset", 0);
-            PaintCursorDrawer.ShowMirrorPlane = EditorPrefs.GetBool(WindowName + "ShowMirrorPlane", true);
-            _loopTwoWays = EditorPrefs.GetBool(WindowName + "_loopTwoWays", true);
+            //_loopTwoWays = EditorPrefs.GetBool(WindowName + "_loopTwoWays", true);
         }
 
         private void OnDisable()
@@ -125,16 +155,11 @@ namespace DAPolyPaint
             SceneView.duringSceneGui -= OnSceneGUI;
             AssemblyReloadEvents.beforeAssemblyReload -= OnBeforeAssemblyReload;
             AssemblyReloadEvents.afterAssemblyReload -= OnAfterAssemblyReload;
-            EditorPrefs.SetBool(WindowName + "_objectInfoFoldout", _objectInfoFoldout);
+            _ui.Save(WindowName);         
+            EditorPrefs.SetBool(WindowName + "ShowMirrorPlane", PaintCursorDrawer.ShowMirrorPlane);
             EditorPrefs.SetFloat(WindowName + "_lastUVpick.x", _lastUVpick.x);
             EditorPrefs.SetFloat(WindowName + "_lastUVpick.y", _lastUVpick.y);
-            EditorPrefs.SetInt(WindowName + "_currToolCode", _currToolCode);
-            EditorPrefs.SetInt(WindowName + "_fillVariant", _fillVariant);
-            EditorPrefs.SetBool(WindowName + "_autoQuads", _autoQuads);
-            EditorPrefs.SetInt(WindowName + "_mirrorAxis", _currMirrorAxis);
-            EditorPrefs.SetFloat(WindowName + "_axisOffset", _axisOffset);
-            EditorPrefs.SetBool(WindowName + "ShowMirrorPlane", PaintCursorDrawer.ShowMirrorPlane);
-            EditorPrefs.SetBool(WindowName + "_loopTwoWays", _loopTwoWays);
+            // EditorPrefs.SetBool(WindowName + "_loopTwoWays", _loopTwoWays);
         }
 
         public void OnBeforeAssemblyReload()
@@ -187,38 +212,38 @@ namespace DAPolyPaint
         private void SceneViewSettingsMods(bool enable)
         {
             var sv = SceneView.lastActiveSceneView;
-            if (_autoShadedWireframe)
+            if (_ui.AutoShadedWireframe)
             {            
                 if (sv == null) return;
                 if (enable)
                 {                   
-                    _savedSceneViewCameraMode = sv.cameraMode;
-                    _savedSceneLighting = sv.sceneLighting;
+                    _ui.SavedSceneViewCameraMode = sv.cameraMode;
+                    _ui.SavedSceneLighting = sv.sceneLighting;
                     sv.cameraMode = SceneView.GetBuiltinCameraMode(DrawCameraMode.TexturedWire);
                     sv.sceneLighting = false;
                     sv.Repaint();
                 }
                 else
                 {
-                    sv.cameraMode = _savedSceneViewCameraMode;
-                    sv.sceneLighting = _savedSceneLighting;
+                    sv.cameraMode = _ui.SavedSceneViewCameraMode;
+                    sv.sceneLighting = _ui.SavedSceneLighting;
                     sv.Repaint();
                 }
             }
             if (enable)
             {
-                _savedSceneViewDrawGizmos = sv.drawGizmos;
+                _ui.SavedSceneViewDrawGizmos = sv.drawGizmos;
                 sv.drawGizmos = true;
             }
             else
             {
-                sv.drawGizmos = _savedSceneViewDrawGizmos;
+                sv.drawGizmos = _ui.SavedSceneViewDrawGizmos;
             }
         }
 
         void StopPaintMode()
         {
-            if (_autoSave)
+            if (_ui.AutoSave)
             {
                 SaveMeshAsset();
             }
@@ -255,7 +280,7 @@ namespace DAPolyPaint
             OnGUI_ObjectStatus();
             OnGUI_TexturePalette();
 
-            _autoShadedWireframe = EGL.ToggleLeft(Temp.Content("Auto-Shaded Wireframe", "Set Shaded Wrieframe and Camera lighting on Paint Mode"), _autoShadedWireframe);
+            _ui.AutoShadedWireframe = EGL.ToggleLeft(Temp.Content("Auto-Shaded Wireframe", "Set Shaded Wrieframe and Camera lighting on Paint Mode"), _ui.AutoShadedWireframe);
 
             //Painting tools
             using (new EditorGUI.DisabledScope(!_paintingMode))
@@ -293,12 +318,12 @@ namespace DAPolyPaint
 
             var RemapClicked = GL.Button("Remap to texture in...");                          
             _remapMaterial = (Material) EGL.ObjectField("Target Material", _remapMaterial, typeof(Material), true);
-            _autoSwitchMaterial = EGL.ToggleLeft("Switch Material after remap", _autoSwitchMaterial);
+            _ui.AutoSwitchMaterial = EGL.ToggleLeft("Switch Material after remap", _ui.AutoSwitchMaterial);
 
             if (RemapClicked)
             {
-                bool ok = TryRemappingTo(_remapMaterial, out var tex2d, _autoSwitchMaterial);
-                if (ok && _autoSwitchMaterial)
+                bool ok = TryRemappingTo(_remapMaterial, out var tex2d, _ui.AutoSwitchMaterial);
+                if (ok && _ui.AutoSwitchMaterial)
                 {
                     if (_targetObject.TryGetComponent<Renderer>(out var r))
                     {
@@ -342,8 +367,8 @@ namespace DAPolyPaint
         private void OnGUI_PaintingTools()
         {
             GL.BeginVertical(EditorStyles.textArea);
-            _toolsFoldedOut = EGL.BeginFoldoutHeaderGroup(_toolsFoldedOut, "Tools");
-            if (_toolsFoldedOut)
+            _ui.ToolsFoldedOut = EGL.BeginFoldoutHeaderGroup(_ui.ToolsFoldedOut, "Tools");
+            if (_ui.ToolsFoldedOut)
             {
                 EGL.Space();
 
@@ -358,13 +383,13 @@ namespace DAPolyPaint
                 switch (_currToolCode)
                 {
                     case ToolType.fill:
-                        _fillVariant = GL.SelectionGrid(_fillVariant, _fillVariantOptions, 4, EditorStyles.radioButton);
+                        _ui.FillVariant = GL.SelectionGrid(_ui.FillVariant, _fillVariantOptions, 4, EditorStyles.radioButton);
                         break;
                     case ToolType.brush:
-                        _autoQuads = EGL.ToggleLeft("Auto-detect quads", _autoQuads);
+                        _ui.AutoQuads = EGL.ToggleLeft("Auto-detect quads", _ui.AutoQuads);
                         break;
                     case ToolType.loop:
-                        _loopTwoWays = EGL.ToggleLeft("Two Ways", _loopTwoWays);
+                        _ui.LoopTwoWays = EGL.ToggleLeft("Two Ways", _ui.LoopTwoWays);
                         break;
                     case ToolType.pick: break;
                     default:
@@ -374,16 +399,16 @@ namespace DAPolyPaint
 
                 if (_currToolCode != ToolType.pick)
                 {
-                    _mirrorCursor = EGL.ToggleLeft(Temp.Content("Mirror Cursor. Axis:", ""), _mirrorCursor);
+                    _ui.MirrorCursor = EGL.ToggleLeft(Temp.Content("Mirror Cursor. Axis:", ""), _ui.MirrorCursor);
                 }
-                PaintCursorDrawer.MirrorMode = _mirrorCursor;
-                if (_mirrorCursor)
+                PaintCursorDrawer.MirrorMode = _ui.MirrorCursor;
+                if (_ui.MirrorCursor)
                 {
-                    _currMirrorAxis = GL.Toolbar(_currMirrorAxis, _mirrorAxis);
-                    _axisOffset = EGL.FloatField("Axis Offset:", _axisOffset);
+                    _ui.CurrMirrorAxis = GL.Toolbar(_ui.CurrMirrorAxis, _mirrorAxis);
+                    _ui.AxisOffset = EGL.FloatField("Axis Offset:", _ui.AxisOffset);
                     PaintCursorDrawer.ShowMirrorPlane = EGL.ToggleLeft("Show Mirror Plane", PaintCursorDrawer.ShowMirrorPlane);
-                    PaintCursorDrawer.MirrorAxis = _currMirrorAxis;
-                    PaintCursorDrawer.AxisOffset = _axisOffset;
+                    PaintCursorDrawer.MirrorAxis = _ui.CurrMirrorAxis;
+                    PaintCursorDrawer.AxisOffset = _ui.AxisOffset;
                     if (PaintCursorDrawer.ShowMirrorPlane) SceneView.lastActiveSceneView.Repaint();
                 }               
 
@@ -396,7 +421,7 @@ namespace DAPolyPaint
         private void OnGUI_ToolAction()
         {
             EGL.LabelField("Tool Action:", EditorStyles.miniLabel);
-            GL.Toolbar(0, new string[] {"Paint","Select" });
+            _ui.ToolAction =  GL.Toolbar(_ui.ToolAction, new string[] {"Paint","Select" });
         }
 
         private void OnGUI_InputEvents()
@@ -433,7 +458,7 @@ namespace DAPolyPaint
         {
             //saving mesh test
             EGL.Space();
-            _autoSave = EGL.ToggleLeft("Auto-save at the end of the session", _autoSave);
+            _ui.AutoSave = EGL.ToggleLeft("Auto-save at the end of the session", _ui.AutoSave);
 
             EGL.BeginHorizontal();
                          
@@ -686,8 +711,8 @@ namespace DAPolyPaint
                 if (!check.isOk) s += ": Issues...";
             }
 
-            _objectInfoFoldout = EGL.BeginFoldoutHeaderGroup(_objectInfoFoldout, s);
-            if (_objectInfoFoldout)
+            _ui.ObjectInfoFoldout = EGL.BeginFoldoutHeaderGroup(_ui.ObjectInfoFoldout, s);
+            if (_ui.ObjectInfoFoldout)
             {
                 if (check.isOk)
                 {
@@ -802,7 +827,7 @@ namespace DAPolyPaint
         {
             _prevFace = _lastFace;
             _prevFace_Mirror = _lastFace_Mirror;
-            (_lastFace, _lastFace_Mirror)  = GetFaceHit(sv, currMousePos, _mirrorCursor && (_currToolCode != ToolType.pick) );      
+            (_lastFace, _lastFace_Mirror)  = GetFaceHit(sv, currMousePos, _ui.MirrorCursor && (_currToolCode != ToolType.pick) );      
         }
 
         /// <summary>
@@ -861,8 +886,8 @@ namespace DAPolyPaint
 
         Vector3 MirrorFromPivot(Vector3 vec, bool isPosition = true) 
         { 
-            var plane = PolyPaintWindow.AxisDirection(_currMirrorAxis, _targetObject.transform);
-            Vector3 offset = plane * _axisOffset;
+            var plane = PolyPaintWindow.AxisDirection(_ui.CurrMirrorAxis, _targetObject.transform);
+            Vector3 offset = plane * _ui.AxisOffset;
 
             var origin = _targetObject.transform.position + offset;
             if (isPosition)
@@ -1056,7 +1081,7 @@ namespace DAPolyPaint
         private void ToolFillMouseDown()
         {
             var anyFace = _lastFace >= 0;
-            var anyMirror = (_mirrorCursor && _lastFace_Mirror >= 0);
+            var anyMirror = (_ui.MirrorCursor && _lastFace_Mirror >= 0);
             if (anyFace || anyMirror)
             {
                 if (anyFace) DoFillTool(_lastFace, _lastUVpick);
@@ -1091,7 +1116,7 @@ namespace DAPolyPaint
         private void ToolLoopMouseDrag()
         {
             BuildLoopCursor(_prevFace, _lastFace, true);
-            if (_mirrorCursor) BuildLoopCursor(_prevFace_Mirror, _lastFace_Mirror, false);
+            if (_ui.MirrorCursor) BuildLoopCursor(_prevFace_Mirror, _lastFace_Mirror, false);
         }
 
         private void TryPick(RaycastHit hit)
@@ -1102,7 +1127,7 @@ namespace DAPolyPaint
 
         private void DoFillTool(int face, Vector2 UV)
         {
-            switch (_fillVariant)
+            switch (_ui.FillVariant)
             {
                 case FillVariant.flood: _painter.FillPaint(face, UV); break;
                 case FillVariant.replace: _painter.FillReplace(face, UV); break;
@@ -1213,7 +1238,7 @@ namespace DAPolyPaint
         private void BuildLoopCursor(int fromFace, int toFace, bool clearPolyCursor)
         {
             var loop = _painter.FindLoop(fromFace, toFace);
-            if (_loopTwoWays)
+            if (_ui.LoopTwoWays)
             {
                 var loopBack = _painter.FindLoop(toFace, fromFace);
                 loop.UnionWith(loopBack);
@@ -1245,7 +1270,7 @@ namespace DAPolyPaint
         private void PaintFace()
         {
             _painter.SetUV(_lastFace, _lastUVpick);
-            if (_autoQuads)
+            if (_ui.AutoQuads)
             {
                 var quadBro = _painter.FindQuad(_lastFace);
                 if (quadBro != -1)
@@ -1286,7 +1311,7 @@ namespace DAPolyPaint
             if (_lastFace >= 0)
             {                
                 PaintCursorDrawer.PolyCursor.Add(CreatePoly(_lastFace));
-                if (_autoQuads && (_currToolCode == ToolType.brush || _currToolCode == ToolType.loop))
+                if (_ui.AutoQuads && (_currToolCode == ToolType.brush || _currToolCode == ToolType.loop))
                 {
                     var quadBro = _painter.FindQuad(_lastFace);
                     if (quadBro != -1)
@@ -1295,10 +1320,10 @@ namespace DAPolyPaint
                     }
                 }                
             }
-            if (_mirrorCursor&&(_lastFace_Mirror >= 0 ))
+            if (_ui.MirrorCursor&&(_lastFace_Mirror >= 0 ))
             {
                 PaintCursorDrawer.PolyCursor.Add(CreatePoly(_lastFace_Mirror));
-                if (_autoQuads && (_currToolCode == ToolType.brush || _currToolCode == ToolType.loop))
+                if (_ui.AutoQuads && (_currToolCode == ToolType.brush || _currToolCode == ToolType.loop))
                 {
                     var quadBro = _painter.FindQuad(_lastFace_Mirror);
                     if (quadBro != -1)

@@ -970,18 +970,6 @@ namespace DAPolyPaint
         public int backLinkIdx;     //position index on the other face List of links corresponding to this link O.o capichi      
     }
     
-    /// <summary>
-    /// Stores an array of FaceLink objects for a single face, providing direct access to its links by triangle side.
-    /// </summary>
-    public class FaceData
-    {
-        public FaceLink[] links;        
-
-        public FaceData()
-        {
-            links = new FaceLink[3];
-        }
-    }
 
     /// <summary>
     /// Represents an edge in the mesh defined by two vertex indices.
