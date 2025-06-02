@@ -57,17 +57,17 @@ namespace DAPolyPaint
         int _currMirrorAxis;
         float _axisOffset;
         readonly GUIContent[] _toolNames_row1 = {
-            new GUIContent("Brush", ""), 
-            new GUIContent("Fill", "Ctrl"), 
-            new GUIContent("Loop", "Ctrl+Shift"), 
-            new GUIContent("Pick","Shift") 
+            new GUIContent("Brush", "Draw face by face"), 
+            new GUIContent("Fill", "Fill areas (Shortcut: Ctrl)"), 
+            new GUIContent("Loop", "Draw on mesh loops (Shortcut: Ctrl+Shift)"), 
+            new GUIContent("Pick","Get color from mesh (Shortcut: Shift)") 
         };
         readonly string[] _mirrorAxis = new string[] { "X", "Y", "Z" };
         readonly string[] _toolHints = new string[] {
             "Click or Drag over faces", //brush
-            "Click a starting face", //fill
-            "Drag over a quad edge", //loop
-            "Click a face to get color" //pick
+            "Click a starting face (Shortcut: Ctrl)", //fill
+            "Drag over a quad edge (Shortcut: Ctrl+Shift)", //loop
+            "Click a face to get color (Shortcut: Shift)" //pick
         };
         int _currToolCode = 0;        
         int _fillVariant;
@@ -170,7 +170,7 @@ namespace DAPolyPaint
                 PrepareObject();
                 _paintingMode = true;
                 _lastPixelColor = _painter.GetTextureColor(_lastUVpick);
-                PaintCursorDrawer.SetPixelColor(_lastPixelColor);
+                PaintCursorDrawer.CurrPixelColor =  _lastPixelColor;
                 SceneView.lastActiveSceneView.Repaint();
                 PaintCursorDrawer.PaintMode = true;
             }
@@ -350,9 +350,10 @@ namespace DAPolyPaint
                 //TODO: toolbar selected parameter can be set to -1 to unselect all buttons.
                 //TOOLBAR of: Brush, Fill, Loop, Pick
                 SetCurrTool(GL.Toolbar(_currToolCode, _toolNames_row1));
+                    
                 if (_currToolCode >= 0 && _currToolCode <= ToolType.ToolNames.Length)
                 {
-                    EGL.LabelField(_toolHints[_currToolCode], EditorStyles.miniLabel);
+                   EGL.LabelField(_toolHints[_currToolCode], EditorStyles.miniLabel);
                 }
                 switch (_currToolCode)
                 {
@@ -636,7 +637,7 @@ namespace DAPolyPaint
                         _lastUVpick = mousePos;
 
                         _lastPixelColor = _painter.GetTextureColor(_lastUVpick);
-                        PaintCursorDrawer.SetPixelColor(_lastPixelColor);
+                        PaintCursorDrawer.CurrPixelColor = _lastPixelColor;
 
                         Repaint();
                     }
@@ -1096,6 +1097,7 @@ namespace DAPolyPaint
         private void TryPick(RaycastHit hit)
         {            
             _tryPickColor = _painter.GetTextureColor(hit.textureCoord);
+            PaintCursorDrawer.TryPickColor = _tryPickColor;
         }
 
         private void DoFillTool(int face, Vector2 UV)
@@ -1236,7 +1238,7 @@ namespace DAPolyPaint
             {
                 _lastUVpick = _painter.GetUV(face);                
                 _lastPixelColor = _painter.GetTextureColor(_lastUVpick);
-                PaintCursorDrawer.SetPixelColor(_lastPixelColor);
+                PaintCursorDrawer.CurrPixelColor = _lastPixelColor;
             }
         }
 

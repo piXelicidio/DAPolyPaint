@@ -34,8 +34,11 @@ namespace DAPolyPaint
     [CustomEditor(typeof(PaintCursor))]
     public class PaintCursorDrawer : Editor
     {
-        static Color _currPixelColor;
+        private static Color _currPixelColor;
+
         static PolyList _polyCursor = new PolyList();
+        public static Color CurrPixelColor { get { return _currPixelColor; } set { _currPixelColor = value.linear; } }
+        public static Color TryPickColor { get; set; }
         public static int CurrToolCode { get; set; } = 0;
         public static bool PaintMode { get; set; }
         public static bool MirrorMode { get; set; }
@@ -46,11 +49,6 @@ namespace DAPolyPaint
         public static CursorRay[] CursorRays = new CursorRay[2];
         private static Vector3[] _mirrorPlane = new Vector3[5];
 
-        public static void SetPixelColor(Color c)
-        {
-            _currPixelColor = c.linear;
-        }
-
         //Draws
         [DrawGizmo(GizmoType.Selected | GizmoType.NonSelected)]
         static void DrawGizmos(PaintCursor obj, GizmoType gizmoType) //need to be static
@@ -58,7 +56,7 @@ namespace DAPolyPaint
             if (!obj.enabled || !PaintMode) return;
 
             //Drawing cursor triangles
-            if (_polyCursor.Count > 0)
+            if (_polyCursor.Count > 0 && CurrToolCode != ToolType.pick)
             {
                 for (int p = 0; p < _polyCursor.Count; p++)
                 {
@@ -82,8 +80,15 @@ namespace DAPolyPaint
                     var v2 = ray.origin + ray.direction * 0.1f;
                     //Gizmos.color = Color.white;
                     //Gizmos.DrawLine(ray.origin, v2);
-                    Handles.color = Color.white;
-                    Handles.DrawDottedLine(ray.origin, v2, 2f);
+                    if (CurrToolCode != ToolType.pick)
+                    {
+                        Handles.color = _currPixelColor;
+                    }
+                    else
+                    {
+                        Handles.color = TryPickColor;
+                    }
+                        Handles.DrawDottedLine(ray.origin, v2, 2f);
                     if (CurrToolCode > 0 && CurrToolCode < ToolType.ToolNames.Length)
                     {
                         Handles.Label(v2, ToolType.ToolNames[CurrToolCode]);
