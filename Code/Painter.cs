@@ -23,9 +23,11 @@ namespace DAPolyPaint
         int[] _triangles;
         int[] _indexedFaces;
         float[] _angles;                //angle of each triangle corners
-        List<FaceLink>[] _faceLinks;
-        FaceData[] _faceData;
+        List<FaceLink>[] _AllFaceConnections;
+        FaceLink[,] _faceConnectionsBySide;
         List<List<Vector2>> _undoLevels;
+        HashSet<int> _selectedFaces = new HashSet<int>();
+        HashSet<int> _hiddenFaces = new HashSet<int>();
         int _undoPos;
         private int _undoSequenceCount;
         int _channel = 0;
@@ -63,15 +65,9 @@ namespace DAPolyPaint
         /// </summary>
         void RebuildMeshForPainting()
         {
-            var t = Environment.TickCount;
+            var t = Environment.TickCount;            
             Debug.Log("<b>Preparing mesh...</b> ");
             var m = _targetMesh;
-
-            //var tris = m.triangles;
-            //var vertices = m.vertices;
-            //var UVs = m.uv; //channel 0 
-            //var normals = m.normals;
-            //var boneWeights = m.boneWeights;
 
             _oldMesh = new MeshCopy(m);
 
@@ -402,7 +398,7 @@ namespace DAPolyPaint
                     link.pOut = 3 - (pos[0] + pos[1]); //point left out
 
                     var otherFaceSide = GetTriangleSide(posOther[0], posOther[1]);
-                    var otherLink = _faceData[face2].links[otherFaceSide];
+                    var otherLink = _faceConnectionsBySide[face2,otherFaceSide];
                     bool otherOk = otherLink == null;
                     if (!otherOk)
                     {
@@ -410,23 +406,22 @@ namespace DAPolyPaint
                     }
 
                     //my face side is unlinked?                    
-                    if (_faceData[face1].links[link.side] == null && otherOk)
+                    if (_faceConnectionsBySide[face1, link.side] == null && otherOk)
                     {
                         //other face has this side unlinked or linked to me?                    
 
-                        _faceLinks[face1].Add(link);
-                        _faceData[face1].links[link.side] = link;
+                        _AllFaceConnections[face1].Add(link);
+                        _faceConnectionsBySide[face1, link.side] = link;
                     }
                 }
             }
 
             var sum = 0.0f;
-            _faceLinks = new List<FaceLink>[NumFaces];
-            _faceData = new FaceData[NumFaces];
+            _AllFaceConnections = new List<FaceLink>[NumFaces];
+            _faceConnectionsBySide = new FaceLink[NumFaces,3];
             for (int i = 0; i < NumFaces; i++)
             {
-                _faceLinks[i] = new List<FaceLink>();
-                _faceData[i] = new FaceData();
+                _AllFaceConnections[i] = new List<FaceLink>();
             }
 
             var myVerts = new int[3];
@@ -442,11 +437,11 @@ namespace DAPolyPaint
             //backlinks
             for (int i = 0; i < NumFaces; i++)
             {
-                var links = _faceLinks[i];
+                var links = _AllFaceConnections[i];
                 sum += links.Count;
                 for (int j = links.Count - 1; j >= 0; j--)
                 {
-                    var backlink = _faceLinks[links[j].with].Find(x => x.with == i);
+                    var backlink = _AllFaceConnections[links[j].with].Find(x => x.with == i);
                     if (backlink != null)
                     {
                         backlink.backLinkIdx = j;
@@ -499,11 +494,11 @@ namespace DAPolyPaint
             var best = -1;
             var nearBest = QuadTolerance;
 
-            for (int i = 0; i < _faceLinks[face].Count; i++)
+            for (int i = 0; i < _AllFaceConnections[face].Count; i++)
             {
-                var linkTo = _faceLinks[face][i];
+                var linkTo = _AllFaceConnections[face][i];
                 var faceOther = linkTo.with;
-                var linkFrom = _faceLinks[faceOther][linkTo.backLinkIdx];
+                var linkFrom = _AllFaceConnections[faceOther][linkTo.backLinkIdx];
                 if (linkFrom.with != face)
                 {
                     Debug.LogWarning("Bad backlinkIdx!");
@@ -571,7 +566,7 @@ namespace DAPolyPaint
 
         public List<FaceLink> GetFaceLinks(int face)
         {
-            return _faceLinks[face];
+            return _AllFaceConnections[face];
         }
 
         /// <summary>
@@ -647,7 +642,7 @@ namespace DAPolyPaint
         {
             if (fromFace != -1 && toFace != 1)
             {
-                foreach (var fl in _faceLinks[fromFace])
+                foreach (var fl in _AllFaceConnections[fromFace])
                 {
                     if (fl.with == toFace)
                     {
@@ -687,7 +682,7 @@ namespace DAPolyPaint
 
                     var SharedEdge_f1_f2 = linkToF2.edge;
                     var jumpToFace = -1;
-                    foreach (FaceLink fl in _faceLinks[f2_quadBro])
+                    foreach (FaceLink fl in _AllFaceConnections[f2_quadBro])
                     {
                         if (!fl.edge.HaveSharedVerts(SharedEdge_f1_f2))
                         {
