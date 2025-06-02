@@ -32,11 +32,11 @@ namespace DAPolyPaint
     /// With this class we can draw the cursor in the scene view using Gizmos.DrawLine.
     /// </summary>
     [CustomEditor(typeof(PaintCursor))]
-    public class PaintEditor : Editor
+    public class PaintCursorDrawer : Editor
     {
         static Color _currPixelColor;
         static PolyList _polyCursor = new PolyList();
-
+        public static int CurrToolCode { get; set; } = 0;
         public static bool PaintMode { get; set; }
         public static bool MirrorMode { get; set; }
         public static int MirrorAxis { get; set; }
@@ -55,46 +55,48 @@ namespace DAPolyPaint
         [DrawGizmo(GizmoType.Selected | GizmoType.NonSelected)]
         static void DrawGizmos(PaintCursor obj, GizmoType gizmoType) //need to be static
         {
-            if (!obj.enabled) return;
-            if (PaintMode)
+            if (!obj.enabled || !PaintMode) return;
+
+            //Drawing cursor triangles
+            if (_polyCursor.Count > 0)
             {
-                //Drawing cursor triangles
-                if (_polyCursor.Count > 0)
+                for (int p = 0; p < _polyCursor.Count; p++)
                 {
-                    for (int p = 0; p < _polyCursor.Count; p++)
+                    var poly = _polyCursor[p];
+                    if (poly.Count > 2)
                     {
-                        var poly = _polyCursor[p];
-                        if (poly.Count > 2)
-                        {
-                            var average = Vector3.zero;
-
-                            for (var i = 0; i < poly.Count; i++)
-                            {
-                                Gizmos.color = _currPixelColor;
-                                Gizmos.DrawLine(poly[i], poly[(i + 1) % poly.Count]);
-                                average += poly[i];
-                            }
-                        }
+                        Handles.color = _currPixelColor;        
+                        Vector3 a = poly[0];
+                        Vector3 b = poly[1];
+                        Vector3 c = poly[2];                                              
+                        Handles.DrawAAConvexPolygon(new Vector3[] { a, b, c });
                     }
-                }
-
-                //Drawing cursor rays
-                foreach (CursorRay ray in CursorRays)
-                {
-                    if (ray.enabled)
-                    {
-                        var v2 = ray.origin + ray.direction * 0.1f;
-                        Gizmos.color = Color.white;
-                        Gizmos.DrawLine(ray.origin, v2);
-                    }
-                }
-
-                //mirror axis..
-                if (MirrorMode && ShowMirrorPlane)
-                {
-                    DrawMirrorPlane(obj);
                 }
             }
+
+            //Drawing cursor rays
+            foreach (CursorRay ray in CursorRays)
+            {
+                if (ray.enabled)
+                {
+                    var v2 = ray.origin + ray.direction * 0.1f;
+                    //Gizmos.color = Color.white;
+                    //Gizmos.DrawLine(ray.origin, v2);
+                    Handles.color = Color.white;
+                    Handles.DrawDottedLine(ray.origin, v2, 2f);
+                    if (CurrToolCode > 0 && CurrToolCode < ToolType.ToolNames.Length)
+                    {
+                        Handles.Label(v2, ToolType.ToolNames[CurrToolCode]);
+                    }
+                }
+            }
+
+            //mirror axis..
+            if (MirrorMode && ShowMirrorPlane)
+            {
+                DrawMirrorPlane(obj);
+            }
+
 
         }
 
@@ -158,6 +160,7 @@ namespace DAPolyPaint
         public const int fill = 1;
         public const int loop = 2;
         public const int pick = 3;
+        public static string[] ToolNames = new string[] { "Brush", "Fill", "Loop", "Pick" };
     }
 
     public static class FillVariant
@@ -165,6 +168,7 @@ namespace DAPolyPaint
         public const int flood = 0;
         public const int replace = 1;
         public const int element = 2;
+        public const int all = 3;
     }
 
     public static class Temp
