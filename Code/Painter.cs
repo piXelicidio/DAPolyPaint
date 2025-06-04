@@ -34,11 +34,13 @@ namespace DAPolyPaint
         Texture2D _textureData;
         private MeshCopy _oldMesh;
 
+        public ToolAction ToolAction { get; set; }
         public Mesh Target { get { return _targetMesh; } }
         public int NumUVCalls { get; private set; }
         public int NumFaces { get { return _triangles.Length / 3; } }
         public int NumVerts { get { return _vertices.Length; } }
         public float QuadTolerance { get; set; }
+        public HashSet<int> SelectedFaces { get { return _selectedFaces; } }
 
         public Painter()
         {
@@ -528,16 +530,30 @@ namespace DAPolyPaint
         }
 
 
-        public void SetUV(int face, Vector2 uvc, bool update = true)
+        public void Set(int face, Vector2 uvc)
         {
-            if (face >= 0)
+            switch (ToolAction)
             {
-                _UVs[face * 3] = uvc;
-                _UVs[face * 3 + 1] = uvc;
-                _UVs[face * 3 + 2] = uvc;
-                if (update) _targetMesh.SetUVs(_channel, _UVs);  //could be improved if Start, Length parameters actually worked                
-                NumUVCalls++;
+                case ToolAction.Paint:
+                    if (face >= 0)
+                    {
+                        _UVs[face * 3] = uvc;
+                        _UVs[face * 3 + 1] = uvc;
+                        _UVs[face * 3 + 2] = uvc;
+                        NumUVCalls++;
+                    }
+                    break;
+                case ToolAction.Select:
+                    _selectedFaces.Add(face);
+                    break;
+
             }
+        }
+
+
+        public void RefreshUVs()
+        {
+            _targetMesh.SetUVs(_channel, _UVs);
         }
 
         //A face actually have 3 UV values but, here all are the same
@@ -555,11 +571,11 @@ namespace DAPolyPaint
 
         public void FullRepaint(Vector2 uvc)
         {
-            for (int i = 0; i < _UVs.Count; i++)
+            for (int i = 0; i < NumFaces; i++)
             {
-                _UVs[i] = uvc;
+                Set(i, uvc);
             }
-            _targetMesh.SetUVs(_channel, _UVs);
+            RefreshUVs();
         }
 
 
@@ -589,12 +605,9 @@ namespace DAPolyPaint
                 //paint border
                 foreach (int face in border)
                 {
-                    _UVs[face * 3] = uvc;
-                    _UVs[face * 3 + 1] = uvc;
-                    _UVs[face * 3 + 2] = uvc;
+                    Set(face, uvc);
                     visited[face] = true;
                 }
-                _targetMesh.SetUVs(_channel, _UVs);  //can be called at the end just once
                 //find neighbors
                 neighbors.Clear();
 
@@ -624,6 +637,8 @@ namespace DAPolyPaint
 
                 iters++;
             } while (border.Count > 0 && iters < 1000);  //TODO: Improve this arbitrary limit
+            RefreshUVs(); 
+
             //Debug.Log(String.Format("Iters:{0} Elapsed:{1}ms", iters, Environment.TickCount - t));
         }
 
@@ -741,7 +756,7 @@ namespace DAPolyPaint
                 {
                     _UVs[i] = state[i];
                 }
-                _targetMesh.SetUVs(_channel, _UVs);
+                RefreshUVs();
                 _undoPos--;
                 _undoSequenceCount++;
             }
@@ -759,7 +774,7 @@ namespace DAPolyPaint
                 {
                     _UVs[i] = state[i];
                 }
-                _targetMesh.SetUVs(_channel, _UVs);
+                RefreshUVs();
             }
         }
 
@@ -781,10 +796,10 @@ namespace DAPolyPaint
                 {
                     if (GetTextureColor(GetUV(i)) == pick)
                     {
-                        SetUV(i, UV, false);
+                        Set(i, UV);
                     }
                 }
-                _targetMesh.SetUVs(_channel, _UVs);
+                RefreshUVs();
             }
         }
 
@@ -906,7 +921,7 @@ namespace DAPolyPaint
                 Color newColor;
                 Vector2 newUV;
                 findNearest(oldColor, out newColor, out newUV);   
-                SetUV(i, newUV, false);
+                Set(i, newUV);
             }
             RefreshUVs();
             if (switchTexture) _textureData = tex2d;
@@ -914,10 +929,7 @@ namespace DAPolyPaint
             return true;
         }
 
-        private void RefreshUVs()
-        {
-            _targetMesh.SetUVs(_channel, _UVs);
-        }
+
     }
 
     /// <summary>
@@ -995,5 +1007,7 @@ namespace DAPolyPaint
             return (v1 == other.v1 || v1 == other.v2 || v2 == other.v1 || v2 == other.v2);
         }
     }
+
+    public enum ToolAction { Paint = 0, Select = 1 }
 
 }

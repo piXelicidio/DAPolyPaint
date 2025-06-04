@@ -367,7 +367,8 @@ namespace DAPolyPaint
         private void OnGUI_PaintingTools()
         {
             GL.BeginVertical(EditorStyles.textArea);
-            _ui.ToolsFoldedOut = EGL.BeginFoldoutHeaderGroup(_ui.ToolsFoldedOut, "Tools");
+            var actionStr = _ui.ToolAction == 0 ? "painting" : "selecting";
+            _ui.ToolsFoldedOut = EGL.BeginFoldoutHeaderGroup(_ui.ToolsFoldedOut, "Tools (" +actionStr + ")");
             if (_ui.ToolsFoldedOut)
             {
                 EGL.Space();
@@ -422,6 +423,7 @@ namespace DAPolyPaint
         {
             EGL.LabelField("Tool Action:", EditorStyles.miniLabel);
             _ui.ToolAction =  GL.Toolbar(_ui.ToolAction, new string[] {"Paint","Select" });
+            _painter.ToolAction = (ToolAction) _ui.ToolAction;
         }
 
         private void OnGUI_InputEvents()
@@ -1049,12 +1051,29 @@ namespace DAPolyPaint
                     PaintUsingCursor();
 
                 _painter.Undo_SaveState();
+                if (_ui.ToolAction == (int)ToolAction.Select)
+                {
+                    RebuildSelection();
+                }
             }
 
             ReleaseInput(ev);
             _isMousePressed = false;
         }
 
+        private void RebuildSelection()
+        {
+            var polylist = PaintCursorDrawer.SelectedFaces;
+            polylist.Clear();
+            foreach (var face in _painter.SelectedFaces)
+            {
+                if (face >= 0) 
+                {
+                    var p = CreatePoly(face);
+                    polylist.Add(CreatePoly(face));
+                }
+            }
+        }
 
         private void HandleMouseDownLeftClick(SceneView scene, int id, Event ev, int tool)
         {
@@ -1087,6 +1106,10 @@ namespace DAPolyPaint
                 if (anyFace) DoFillTool(_lastFace, _lastUVpick);
                 if (anyMirror) DoFillTool(_lastFace_Mirror, _lastUVpick);
                 _painter.Undo_SaveState();
+                if (_ui.ToolAction == (int)ToolAction.Select)
+                {
+                    RebuildSelection();
+                }
             }
         }
 
@@ -1267,18 +1290,6 @@ namespace DAPolyPaint
             }
         }
 
-        private void PaintFace()
-        {
-            _painter.SetUV(_lastFace, _lastUVpick);
-            if (_ui.AutoQuads)
-            {
-                var quadBro = _painter.FindQuad(_lastFace);
-                if (quadBro != -1)
-                {
-                    _painter.SetUV(quadBro, _lastUVpick);
-                }
-            }
-        }
 
         /// <summary>
         /// Apply the painting using the current cursor info, that may include multiple faces.
@@ -1287,8 +1298,9 @@ namespace DAPolyPaint
         {
             foreach (var polyFace in PaintCursorDrawer.PolyCursor)
             {
-                _painter.SetUV(polyFace.FaceNum, _lastUVpick);
+                _painter.Set(polyFace.FaceNum, _lastUVpick);
             }
+            _painter.RefreshUVs();
         }
 
         /// <summary>

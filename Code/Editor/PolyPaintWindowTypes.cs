@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEditor.ShortcutManagement;
@@ -35,6 +36,7 @@ namespace DAPolyPaint
     public class PaintCursorDrawer : Editor
     {
         private static Color _currPixelColor;
+        private static PolyList _selectedFaces = new PolyList();
 
         static PolyList _polyCursor = new PolyList();
         public static Color CurrPixelColor { get { return _currPixelColor; } set { _currPixelColor = value.linear; } }
@@ -45,9 +47,14 @@ namespace DAPolyPaint
         public static int MirrorAxis { get; set; }
         public static bool ShowMirrorPlane { get; set; }
         public static float AxisOffset { get; set; }
+        public static PolyList SelectedFaces { get { return _selectedFaces; } } 
         public static PolyList PolyCursor { get { return _polyCursor; } }
         public static CursorRay[] CursorRays = new CursorRay[2];
         private static Vector3[] _mirrorPlane = new Vector3[5];
+
+        public PaintCursorDrawer()
+        { 
+        }
 
         //Draws
         [DrawGizmo(GizmoType.Selected | GizmoType.NonSelected)]
@@ -55,24 +62,36 @@ namespace DAPolyPaint
         {
             if (!obj.enabled || !PaintMode) return;
 
-            //Drawing cursor triangles
-            if (_polyCursor.Count > 0 && CurrToolCode != ToolType.pick)
+            DrawCursor();
+            DrawCursorRays();
+
+            //mirror axis..
+            if (MirrorMode && ShowMirrorPlane)
             {
-                for (int p = 0; p < _polyCursor.Count; p++)
+                DrawMirrorPlane(obj);
+            }
+            DrawSelected();        }
+
+        private static void DrawSelected()
+        {
+            for (int p = 0; p < _selectedFaces.Count; p++)
+            {
+                var poly = _selectedFaces[p];
+                if (poly.Count > 2)
                 {
-                    var poly = _polyCursor[p];
-                    if (poly.Count > 2)
-                    {
-                        Handles.color = _currPixelColor;        
-                        Vector3 a = poly[0];
-                        Vector3 b = poly[1];
-                        Vector3 c = poly[2];                                              
-                        Handles.DrawAAConvexPolygon(new Vector3[] { a, b, c });
-                    }
+                    Handles.color = new Color(1f, 0.4f, 0f);
+                    Vector3 a = poly[0];
+                    Vector3 b = poly[1];
+                    Vector3 c = poly[2];
+                    Vector3 d = poly[0];
+                    Handles.DrawPolyLine(new Vector3[] { a, b, c, d });
+                    //Handles.DrawDottedLines(new Vector3[] { a, b, c, d }, 2f);
                 }
             }
+        }
 
-            //Drawing cursor rays
+        private static void DrawCursorRays()
+        {
             foreach (CursorRay ray in CursorRays)
             {
                 if (ray.enabled)
@@ -88,21 +107,32 @@ namespace DAPolyPaint
                     {
                         Handles.color = TryPickColor;
                     }
-                        Handles.DrawDottedLine(ray.origin, v2, 2f);
+                    Handles.DrawDottedLine(ray.origin, v2, 2f);
                     if (CurrToolCode > 0 && CurrToolCode < ToolType.ToolNames.Length)
                     {
                         Handles.Label(v2, ToolType.ToolNames[CurrToolCode]);
                     }
                 }
             }
+        }
 
-            //mirror axis..
-            if (MirrorMode && ShowMirrorPlane)
+        private static void DrawCursor()
+        {
+            if (_polyCursor.Count > 0 && CurrToolCode != ToolType.pick)
             {
-                DrawMirrorPlane(obj);
+                for (int p = 0; p < _polyCursor.Count; p++)
+                {
+                    var poly = _polyCursor[p];
+                    if (poly.Count > 2)
+                    {
+                        Handles.color = _currPixelColor;
+                        Vector3 a = poly[0];
+                        Vector3 b = poly[1];
+                        Vector3 c = poly[2];
+                        Handles.DrawAAConvexPolygon(new Vector3[] { a, b, c });
+                    }
+                }
             }
-
-
         }
 
         private static void DrawMirrorPlane(PaintCursor obj)
