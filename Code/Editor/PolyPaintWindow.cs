@@ -1,12 +1,13 @@
-using System.Collections.Generic;
-using UnityEngine;
-using UnityEditor;
-using EGL = UnityEditor.EditorGUILayout;
-using GL = UnityEngine.GUILayout;
-using EGU = UnityEditor.EditorGUIUtility;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Text.RegularExpressions;
+using UnityEditor;
+using UnityEngine;
+using static UnityEngine.GraphicsBuffer;
+using EGL = UnityEditor.EditorGUILayout;
+using EGU = UnityEditor.EditorGUIUtility;
+using GL = UnityEngine.GUILayout;
 
 
 namespace DAPolyPaint 
@@ -29,6 +30,7 @@ namespace DAPolyPaint
         Mesh _skinAffected;
         Vector3[] _verticesSkinned;
         Texture _targetTexture;
+        Material _targetMaterial;
         Texture2D _textureData;
         Vector3 _currMousePosCam;
         RaycastHit _lastHit;
@@ -182,6 +184,25 @@ namespace DAPolyPaint
         void StartPaintMode()
         {
             CheckComponents(_targetObject);
+            if (_targetMesh != null)
+            {
+                if (_targetMesh.subMeshCount > 1)
+                {
+                    var ok = EditorUtility.DisplayDialog(
+                        "Mesh is multimaterial, proceed?",
+                        $"Object has multiple materials (submeshes == {_targetMesh.subMeshCount}). Submeshes will be joined and first valid material with texture selected.",
+                        "Ok, proceed!",
+                        "Cancel"
+                        );
+                    if (ok)
+                    { 
+                        var r = _targetObject.GetComponent<Renderer>();
+                        //_targetMesh.subMeshCount = 1;
+                        r.materials = new Material[] { _targetMaterial };
+                    }
+                    else return;
+                }
+            }
             if (_targetTexture != null)
             {
                 SetPaintingMode(true);
@@ -1407,7 +1428,7 @@ namespace DAPolyPaint
             {
                 _targetTexture = null;
                 _textureData = null;
-                _targetTexture = GetFirstValidTexture(r);
+                (_targetMaterial, _targetTexture) = GetFirstValidMaterialTexture(r);
                 if (_targetTexture != null)
                 {
                     _textureData = ToTexture2D(_targetTexture);
@@ -1420,19 +1441,19 @@ namespace DAPolyPaint
             }
         }
 
-        private Texture GetFirstValidTexture(Renderer r)
+        private (Material, Texture) GetFirstValidMaterialTexture(Renderer r)
         {
             var mats = r.sharedMaterials;
-            if (mats == null || mats.Length == 0) return null;
+            if (mats == null || mats.Length == 0) return (null, null);
             for (int i = 0; i < mats.Length; i++)
             {
                 if (mats[i] != null)
                 {
                     var t = mats[i].mainTexture;
-                    if (t != null) return t;
+                    if (t != null) return (mats[i], t);
                 }
             }
-            return null;
+            return (null, null);
         }
 
         /// <summary>
@@ -1445,8 +1466,7 @@ namespace DAPolyPaint
             if (_targetMesh != null)
             {                
                 (_dummyObject, _dummyCollider) = GetDummy(_targetObject);
-                
-                LogMeshInfo(_targetMesh);
+                LogMeshInfo(_targetMesh);                
                 _painter.SetMeshAndRebuild(_targetMesh, _skinned, _textureData);
                 _vertices = _targetMesh.vertices;
                 if (!_skinned)
