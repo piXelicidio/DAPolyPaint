@@ -367,7 +367,8 @@ namespace DAPolyPaint
         private void OnGUI_PaintingTools()
         {
             GL.BeginVertical(EditorStyles.textArea);
-            var actionStr = _ui.ToolAction == 0 ? "painting" : "selecting";
+            var actionStr = "painting";
+            if (_ui.ToolAction > 0) actionStr = _ui.ToolAction == 1 ? "selecting" : "deselecting";
             _ui.ToolsFoldedOut = EGL.BeginFoldoutHeaderGroup(_ui.ToolsFoldedOut, "Tools (" +actionStr + ")");
             if (_ui.ToolsFoldedOut)
             {
@@ -422,8 +423,15 @@ namespace DAPolyPaint
         private void OnGUI_ToolAction()
         {
             EGL.LabelField("Tool Action:", EditorStyles.miniLabel);
-            _ui.ToolAction =  GL.Toolbar(_ui.ToolAction, new string[] {"Paint","Select" });
+            _ui.ToolAction =  GL.Toolbar(_ui.ToolAction, new string[] {"Paint","Select Add", "Select Sub" });
             _painter.ToolAction = (ToolAction) _ui.ToolAction;
+            PaintCursorDrawer.CurrToolAction = (ToolAction)_ui.ToolAction;
+            if (GL.Button("Clear selection"))
+            {
+                _painter.SelectedFaces.Clear();
+                RebuildSelection();
+                SceneView.lastActiveSceneView.Repaint();
+            }
         }
 
         private void OnGUI_InputEvents()
@@ -693,7 +701,7 @@ namespace DAPolyPaint
         /// </summary>
         private void OnGUI_ObjectStatus()
         {
-            var check = CheckObject();
+            var check = BuildObjectStatusInfo();
             var statusColorRect = EGL.GetControlRect(false, _statusColorBarHeight);
             Color statusColor;
             if (!check.isOk)
@@ -731,14 +739,14 @@ namespace DAPolyPaint
         /// <summary>
         /// Checks the selected GameObject's readiness for painting and returns detailed status information.
         /// </summary>
-        private (bool isOk, string info) CheckObject()
+        private (bool isOk, string info) BuildObjectStatusInfo()
         {
             var info = "";
             var s = "";
             var isOk = true;
-            if (_targetMesh == null) 
+            if (_targetMesh == null)
             {
-                s = "NOT FOUND"; 
+                s = "NOT FOUND";
                 isOk = false;
                 if (_targetObject != null)
                 {
@@ -747,7 +755,7 @@ namespace DAPolyPaint
                     if (m == null)
                     {
                         var ms = _targetObject.GetComponentInChildren<SkinnedMeshRenderer>();
-                        if (ms!=null) childNameWithMesh = ms.gameObject.name;
+                        if (ms != null) childNameWithMesh = ms.gameObject.name;
                     } else
                     {
                         childNameWithMesh = m.gameObject.name;
@@ -757,9 +765,11 @@ namespace DAPolyPaint
                         s += " (But detected on childs)";
                     }
                 }
-                
+            } else
+            {
+                s = "ok";
             }
-            else s = "ok";
+
             info += "Mesh: " + s;
             if (_targetTexture == null) { s = "NOT FOUND"; isOk = false; } else s = _targetTexture.name;
             info += "\nTex: " + s;
@@ -768,6 +778,7 @@ namespace DAPolyPaint
                 //info += "\nFace: " + _lastFace.ToString();
                 //info += "\nSetUVs calls: " + _painter.NumUVCalls.ToString();
                 info += "\nSkinned: " + _skinned.ToString();
+                info += "\nMultimaterial:" + (_targetMesh.subMeshCount > 1).ToString();
             }
             return (isOk, info);
         }
@@ -1051,7 +1062,8 @@ namespace DAPolyPaint
                     PaintUsingCursor();
 
                 _painter.Undo_SaveState();
-                if (_ui.ToolAction == (int)ToolAction.Select)
+
+                if (_ui.ToolAction > 0 ) //is not painting
                 {
                     RebuildSelection();
                 }
@@ -1106,7 +1118,7 @@ namespace DAPolyPaint
                 if (anyFace) DoFillTool(_lastFace, _lastUVpick);
                 if (anyMirror) DoFillTool(_lastFace_Mirror, _lastUVpick);
                 _painter.Undo_SaveState();
-                if (_ui.ToolAction == (int)ToolAction.Select)
+                if (_ui.ToolAction > 0 )
                 {
                     RebuildSelection();
                 }
@@ -1129,7 +1141,11 @@ namespace DAPolyPaint
                     {
                         PickFromSurface(_lastFace);
                     }
-                    else if (tool == ToolType.brush) PaintUsingCursor();
+                    else if (tool == ToolType.brush)
+                    { 
+                        PaintUsingCursor();
+                        if (_ui.ToolAction > 0 ) RebuildSelection();
+                    }
                 }
             }
             scene.Repaint();
@@ -1276,7 +1292,6 @@ namespace DAPolyPaint
                 poly.FaceNum = f;
                 PaintCursorDrawer.PolyCursor.Add(poly);
             }
-            Debug.Log("num faces in loop: " + loop.Count.ToString());
 
         }
 
@@ -1392,8 +1407,7 @@ namespace DAPolyPaint
             {
                 _targetTexture = null;
                 _textureData = null;
-                var mat = r.sharedMaterial;
-                if (mat != null) _targetTexture = mat.mainTexture;
+                _targetTexture = GetFirstValidTexture(r);
                 if (_targetTexture != null)
                 {
                     _textureData = ToTexture2D(_targetTexture);
@@ -1404,6 +1418,21 @@ namespace DAPolyPaint
                 _targetTexture = null;
                 _textureData = null;
             }
+        }
+
+        private Texture GetFirstValidTexture(Renderer r)
+        {
+            var mats = r.sharedMaterials;
+            if (mats == null || mats.Length == 0) return null;
+            for (int i = 0; i < mats.Length; i++)
+            {
+                if (mats[i] != null)
+                {
+                    var t = mats[i].mainTexture;
+                    if (t != null) return t;
+                }
+            }
+            return null;
         }
 
         /// <summary>

@@ -68,7 +68,6 @@ namespace DAPolyPaint
         void RebuildMeshForPainting()
         {
             var t = Environment.TickCount;            
-            Debug.Log("<b>Preparing mesh...</b> ");
             var m = _targetMesh;
 
             _oldMesh = new MeshCopy(m);
@@ -535,16 +534,21 @@ namespace DAPolyPaint
             switch (ToolAction)
             {
                 case ToolAction.Paint:
-                    if (face >= 0)
-                    {
-                        _UVs[face * 3] = uvc;
-                        _UVs[face * 3 + 1] = uvc;
-                        _UVs[face * 3 + 2] = uvc;
-                        NumUVCalls++;
+                    if (face >= 0) {
+                        if ((_selectedFaces.Count == 0) || (_selectedFaces.Count > 0 && _selectedFaces.Contains(face)) )
+                        {
+                            _UVs[face * 3] = uvc;
+                            _UVs[face * 3 + 1] = uvc;
+                            _UVs[face * 3 + 2] = uvc;
+                            NumUVCalls++;
+                        }
                     }
                     break;
                 case ToolAction.Select:
                     _selectedFaces.Add(face);
+                    break;
+                case ToolAction.SelectSub:
+                    _selectedFaces.Remove(face);
                     break;
 
             }
@@ -1008,6 +1012,6 @@ namespace DAPolyPaint
         }
     }
 
-    public enum ToolAction { Paint = 0, Select = 1 }
+    public enum ToolAction { Paint = 0, Select = 1, SelectSub = 2 }
 
 }

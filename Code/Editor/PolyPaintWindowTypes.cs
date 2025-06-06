@@ -42,6 +42,7 @@ namespace DAPolyPaint
         public static Color CurrPixelColor { get { return _currPixelColor; } set { _currPixelColor = value.linear; } }
         public static Color TryPickColor { get; set; }
         public static int CurrToolCode { get; set; } = 0;
+        public static ToolAction CurrToolAction { get; set; }
         public static bool PaintMode { get; set; }
         public static bool MirrorMode { get; set; }
         public static int MirrorAxis { get; set; }
@@ -79,7 +80,7 @@ namespace DAPolyPaint
                 var poly = _selectedFaces[p];
                 if (poly.Count > 2)
                 {
-                    Handles.color = new Color(1f, 0.4f, 0f);
+                    Handles.color = new Color(1f, 0.4f, 0f).linear;
                     Vector3 a = poly[0];
                     Vector3 b = poly[1];
                     Vector3 c = poly[2];
@@ -108,9 +109,13 @@ namespace DAPolyPaint
                         Handles.color = TryPickColor;
                     }
                     Handles.DrawDottedLine(ray.origin, v2, 2f);
-                    if (CurrToolCode > 0 && CurrToolCode < ToolType.ToolNames.Length)
+                    if (CurrToolCode >= 0 && CurrToolCode < ToolType.ToolNames.Length)
                     {
-                        Handles.Label(v2, ToolType.ToolNames[CurrToolCode]);
+                        var actionStr = "";
+                        if (CurrToolAction != ToolAction.Paint && CurrToolCode != ToolType.pick) {
+                            actionStr = CurrToolAction == ToolAction.Select ? " Sel.Add" : " Sel.Sub";
+                        }
+                        Handles.Label(v2, ToolType.ToolNames[CurrToolCode] + actionStr);
                     }
                 }
             }
@@ -120,16 +125,35 @@ namespace DAPolyPaint
         {
             if (_polyCursor.Count > 0 && CurrToolCode != ToolType.pick)
             {
-                for (int p = 0; p < _polyCursor.Count; p++)
+                if (CurrToolAction == ToolAction.Paint)
                 {
-                    var poly = _polyCursor[p];
-                    if (poly.Count > 2)
+                    for (int p = 0; p < _polyCursor.Count; p++)
                     {
-                        Handles.color = _currPixelColor;
-                        Vector3 a = poly[0];
-                        Vector3 b = poly[1];
-                        Vector3 c = poly[2];
-                        Handles.DrawAAConvexPolygon(new Vector3[] { a, b, c });
+                        var poly = _polyCursor[p];
+                        if (poly.Count > 2)
+                        {
+                            Handles.color = _currPixelColor;
+                            Vector3 a = poly[0];
+                            Vector3 b = poly[1];
+                            Vector3 c = poly[2];
+                            Handles.DrawAAConvexPolygon(new Vector3[] { a, b, c });
+                        }
+                    }
+                }
+                else
+                {
+                    for (int p = 0; p < _polyCursor.Count; p++)
+                    {
+                        var poly = _polyCursor[p];
+                        if (poly.Count > 2)
+                        {
+                            Handles.color = new Color(1f, 0.4f, 0f).linear;
+                            Vector3 a = poly[0];
+                            Vector3 b = poly[1];
+                            Vector3 c = poly[2];
+                            Vector3 d = poly[0];
+                            Handles.DrawPolyLine(new Vector3[] { a, b, c, d });
+                        }
                     }
                 }
             }
