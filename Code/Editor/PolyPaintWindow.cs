@@ -191,7 +191,7 @@ namespace DAPolyPaint
         
         void StartPaintMode()
         {
-            CheckComponents(_target.Object);
+            _target = CheckComponents(_target.Object);
             if (_target.Mesh != null)
             {
                 if (_target.Mesh.subMeshCount > 1)
@@ -221,7 +221,7 @@ namespace DAPolyPaint
         {
             if (enable)
             {
-                PrepareObject();
+                PrepareObject(_target, _painter);
                 _paintingMode = true;
                 _lastPixelColor = _painter.GetTextureColor(_lastUVpick);
                 PaintCursorDrawer.CurrPixelColor =  _lastPixelColor;
@@ -628,8 +628,8 @@ namespace DAPolyPaint
                         meshComp.sharedMesh = _target.Mesh;
                         PrefabUtility.RecordPrefabInstancePropertyModifications(meshComp);
                     }
-                    CheckComponents(_target.Object);
-                    PrepareObject();
+                    _target = CheckComponents(_target.Object);
+                    PrepareObject(_target, _painter);
                 }
                 return true;
             }
@@ -1379,10 +1379,10 @@ namespace DAPolyPaint
         {
             if (_paintingMode) return;
             
-            _target.Object = Selection.activeGameObject;
-            if (_target.Object != null)
+            var GO = Selection.activeGameObject;
+            if (GO != null)
             {
-                CheckComponents(_target.Object);
+                _target = CheckComponents(GO);
             }
             else
             {
@@ -1397,41 +1397,45 @@ namespace DAPolyPaint
         /// Examines the provided GameObject to identify its mesh (static or skinned) and material texture,
         /// storing references to these components for use by the painting tool.
         /// </summary>
-        private void CheckComponents(GameObject target)
+        private TargetContext CheckComponents(GameObject targetGO)
         {
-            _target.Skinned = false;
-            var solid = target.GetComponent<MeshFilter>();
-            var skinned = target.GetComponent<SkinnedMeshRenderer>();
+            var t = new TargetContext();
+            if (targetGO == null) return t;
+            t.Object = targetGO;
+            t.Skinned = false;
+            var solid = targetGO.GetComponent<MeshFilter>();
+            var skinned = targetGO.GetComponent<SkinnedMeshRenderer>();
             if (solid != null)
             {
-                _target.Mesh = solid.sharedMesh;
+                t.Mesh = solid.sharedMesh;
             }
             else if (skinned != null)
             {
-                _target.Mesh = skinned.sharedMesh;
-                _target.Skinned = true;
+                t.Mesh = skinned.sharedMesh;
+                t.Skinned = true;
             }
             else
             {
-                _target.Mesh = null;
+                t.Mesh = null;
             }
 
-            var r = target.GetComponent<Renderer>();
+            var r = targetGO.GetComponent<Renderer>();
             if (r != null)
             {
-                _target.Tex = null;
-                _target.TexData = null;
-                (_target.Mat, _target.Tex) = GetFirstValidMaterialTexture(r);
-                if (_target.Tex != null)
+                t.Tex = null;
+                t.TexData = null;
+                (t.Mat, t.Tex) = GetFirstValidMaterialTexture(r);
+                if (t.Tex != null)
                 {
-                    _target.TexData = ToTexture2D(_target.Tex);
+                    t.TexData = ToTexture2D(t.Tex);
                 }
             }
             else
             {
-                _target.Tex = null;
-                _target.TexData = null;
+                t.Tex = null;
+                t.TexData = null;
             }
+            return t;
         }
 
         private (Material, Texture) GetFirstValidMaterialTexture(Renderer r)
@@ -1454,35 +1458,35 @@ namespace DAPolyPaint
         /// creating a hidden mesh collider for raycasting, and configuring the painter with the target mesh data.
         /// For skinned meshes, it bakes a snapshot to support deformations.
         /// </summary>
-        void PrepareObject()
+        void PrepareObject(TargetContext target, Painter painter)
         {
-            if (_target.Mesh != null)
+            if (target.Mesh != null)
             {                
-                (_dummyObject, _dummyCollider) = GetDummy(_target.Object);
-                LogMeshInfo(_target.Mesh);                
-                _painter.SetMeshAndRebuild(_target.Mesh, _target.Skinned, _target.TexData);
-                _target.Vertices = _target.Mesh.vertices;
-                if (!_target.Skinned)
+                (_dummyObject, _dummyCollider) = GetDummy(target.Object);
+                LogMeshInfo(target.Mesh);                
+                painter.SetMeshAndRebuild(target.Mesh, target.Skinned, target.TexData);
+                target.Vertices = target.Mesh.vertices;
+                if (!target.Skinned)
                 {
-                    _dummyCollider.sharedMesh = _target.Mesh;
+                    _dummyCollider.sharedMesh = target.Mesh;
                 }
                 else
                 {
                     //snapshoting the skinned mesh so we can paint over a mesh distorted by bone transformations.
-                    var smr = _target.Object.GetComponent<SkinnedMeshRenderer>();
+                    var smr = target.Object.GetComponent<SkinnedMeshRenderer>();
                     var snapshot = new Mesh();
                     smr.BakeMesh(snapshot, true);
                     _dummyCollider.sharedMesh = snapshot;
 
-                    _target.VerticesSkinned = snapshot.vertices;
+                    target.VerticesSkinned = snapshot.vertices;
                 }
                 _currFace = -1;                                
-                _paintCursor.TargetMesh = _target.Mesh;
+                _paintCursor.TargetMesh = target.Mesh;
                 _paintCursor.enabled = true;
             }
             else
             {
-                Debug.LogWarning("_targetMeshs should be valid before calling PrepareObject()");
+                Debug.LogWarning("targetMeshs should be valid before calling PrepareObject()");
             }
         }
 
