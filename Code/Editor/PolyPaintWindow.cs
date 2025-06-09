@@ -17,24 +17,30 @@ namespace DAPolyPaint
     /// </summary>
     public class PolyPaintWindow : EditorWindow
     {
+        #region ---------- Target Context ----------
+        TargetContext _target = new TargetContext(); 
+        private class TargetContext
+        {
+            public GameObject Object;
+            public Mesh Mesh;
+            public Vector3[] Vertices;
+            public bool Skinned;
+            public Vector3[] VerticesSkinned;
+            public Texture Tex;
+            public Texture2D TexData;
+            public Material Mat;
+        }  
+
+        #endregion
         #region ---------- Painting State ----------
         Painter _painter;
         bool _paintingMode;
         bool _isMousePressed = false;
-        GameObject _targetObject;
         GameObject _dummyObject;
         MeshCollider _dummyCollider;
-        Mesh _targetMesh;
-        Vector3[] _vertices;
-        bool _skinned;
-        Mesh _skinAffected;
-        Vector3[] _verticesSkinned;
-        Texture _targetTexture;
-        Material _targetMaterial;
-        Texture2D _textureData;
         Vector3 _currMousePosCam;
         RaycastHit _lastHit;
-        int _lastFace; //last face hit by raycast
+        int _currFace; //last face hit by raycast
         int _prevFace; //previous face hit by raycast;
         int _prevFace_Mirror;
         PaintCursor _paintCursor;
@@ -48,6 +54,8 @@ namespace DAPolyPaint
         Material _remapMaterial;
         const string DummyName = "$pp_dummy$";
         #endregion
+
+
 
 
         #region --------- User Interface ---------
@@ -183,27 +191,27 @@ namespace DAPolyPaint
         
         void StartPaintMode()
         {
-            CheckComponents(_targetObject);
-            if (_targetMesh != null)
+            CheckComponents(_target.Object);
+            if (_target.Mesh != null)
             {
-                if (_targetMesh.subMeshCount > 1)
+                if (_target.Mesh.subMeshCount > 1)
                 {
                     var ok = EditorUtility.DisplayDialog(
                         "Mesh is multimaterial, proceed?",
-                        $"Object has multiple materials (submeshes == {_targetMesh.subMeshCount}). Submeshes will be joined and first valid material with texture selected.",
+                        $"Object has multiple materials (submeshes == {_target.Mesh.subMeshCount}). Submeshes will be joined and first valid material with texture selected.",
                         "Ok, proceed!",
                         "Cancel"
                         );
                     if (ok)
                     { 
-                        var r = _targetObject.GetComponent<Renderer>();
+                        var r = _target.Object.GetComponent<Renderer>();
                         //_targetMesh.subMeshCount = 1;
-                        r.materials = new Material[] { _targetMaterial };
+                        r.materials = new Material[] { _target.Mat };
                     }
                     else return;
                 }
             }
-            if (_targetTexture != null)
+            if (_target.Tex != null)
             {
                 SetPaintingMode(true);
             }
@@ -225,7 +233,7 @@ namespace DAPolyPaint
                 _paintingMode = false;
                 SceneView.lastActiveSceneView.Repaint();
                 PaintCursorDrawer.PaintMode = false;
-                _paintCursor.enabled = false;
+                if (_paintCursor!=null) _paintCursor.enabled = false;
             }
             SceneViewSettingsMods(enable);
         }
@@ -283,7 +291,7 @@ namespace DAPolyPaint
 
             //Big PAINT MODE button
             _scrollPos = EGL.BeginScrollView(_scrollPos);
-            using (new EditorGUI.DisabledScope(_targetTexture == null))
+            using (new EditorGUI.DisabledScope(_target.Tex == null))
             {
                 if (!_paintingMode)
                 {
@@ -306,7 +314,8 @@ namespace DAPolyPaint
             //Painting tools
             using (new EditorGUI.DisabledScope(!_paintingMode))
             {               
-                OnGUI_PaintingTools();                                    
+                OnGUI_PaintingTools();  
+                OnGUI_SelectionCommands();
                 OnGUI_UndoRedo();
                 OnGUI_SavePaintedMesh();
                 OnGUI_Remapping();                
@@ -346,11 +355,11 @@ namespace DAPolyPaint
                 bool ok = TryRemappingTo(_remapMaterial, out var tex2d, _ui.AutoSwitchMaterial);
                 if (ok && _ui.AutoSwitchMaterial)
                 {
-                    if (_targetObject.TryGetComponent<Renderer>(out var r))
+                    if (_target.Object.TryGetComponent<Renderer>(out var r))
                     {
                         r.material = _remapMaterial;
-                        _targetTexture = r.sharedMaterial.mainTexture;
-                        _textureData = tex2d;                        
+                        _target.Tex = r.sharedMaterial.mainTexture;
+                        _target.TexData = tex2d;                        
                     }
                 }
             }
@@ -444,9 +453,15 @@ namespace DAPolyPaint
         private void OnGUI_ToolAction()
         {
             EGL.LabelField("Tool Action:", EditorStyles.miniLabel);
-            _ui.ToolAction =  GL.Toolbar(_ui.ToolAction, new string[] {"Paint","Select Add", "Select Sub" });
-            _painter.ToolAction = (ToolAction) _ui.ToolAction;
+            _ui.ToolAction = GL.Toolbar(_ui.ToolAction, new string[] { "Paint", "Select Add", "Select Sub" });
+            _painter.ToolAction = (ToolAction)_ui.ToolAction;
             PaintCursorDrawer.CurrToolAction = (ToolAction)_ui.ToolAction;
+        }
+
+        private void OnGUI_SelectionCommands()
+        {
+            EGL.Space();
+            EGL.LabelField("Selection commands:", EditorStyles.miniLabel);
             if (GL.Button("Clear selection"))
             {
                 _painter.SelectedFaces.Clear();
@@ -538,7 +553,7 @@ namespace DAPolyPaint
         /// </summary>
         public bool SaveMeshAsset(bool optimizeMesh = false, bool forceNewFileName = false)
         {
-            var currentMeshFile = AssetDatabase.GetAssetPath(_targetMesh);
+            var currentMeshFile = AssetDatabase.GetAssetPath(_target.Mesh);
             Debug.Log(currentMeshFile);
             var projectPath = Path.GetDirectoryName(Application.dataPath);
             Debug.Log(projectPath);
@@ -577,7 +592,7 @@ namespace DAPolyPaint
                     {                     
                         if (newFileName == "unity default resources")
                         {
-                            newFileName = ConvertToValidFileName(_targetMesh.name);
+                            newFileName = ConvertToValidFileName(_target.Mesh.name);
                         }                        
                     }
                     newFileName += ".asset";
@@ -587,33 +602,33 @@ namespace DAPolyPaint
                     newFileName = EditorUtility.SaveFilePanelInProject("Save As...", newFileName, "asset", "Saving as new mesh data asset", newPath);
                     if (newFileName == "") return false;
                     //newPath = AssetDatabase.GenerateUniqueAssetPath(newPath);
-                    var mesh = Instantiate(_targetMesh) as Mesh;
+                    var mesh = Instantiate(_target.Mesh) as Mesh;
                     AssetDatabase.CreateAsset(mesh, newFileName);
                     reassign = true; 
                 } else
                 {
-                    EditorUtility.SetDirty(_targetMesh);
+                    EditorUtility.SetDirty(_target.Mesh);
                 }
                 AssetDatabase.SaveAssets();
                 AssetDatabase.Refresh();
                 if (reassign)
                 {                    
-                    _targetMesh = AssetDatabase.LoadAssetAtPath<Mesh>(newFileName);
-                    if (_skinned)
+                    _target.Mesh = AssetDatabase.LoadAssetAtPath<Mesh>(newFileName);
+                    if (_target.Skinned)
                     {
-                        var meshComp = _targetObject.GetComponent<SkinnedMeshRenderer>();
+                        var meshComp = _target.Object.GetComponent<SkinnedMeshRenderer>();
                         Undo.RecordObject(meshComp, "PolyPaint Mesh");
-                        meshComp.sharedMesh = _targetMesh;
+                        meshComp.sharedMesh = _target.Mesh;
                         PrefabUtility.RecordPrefabInstancePropertyModifications(meshComp);
                     }
                     else
                     {
-                        var meshComp = _targetObject.GetComponent<MeshFilter>();
+                        var meshComp = _target.Object.GetComponent<MeshFilter>();
                         Undo.RecordObject(meshComp, "PolyPaint Mesh");
-                        meshComp.sharedMesh = _targetMesh;
+                        meshComp.sharedMesh = _target.Mesh;
                         PrefabUtility.RecordPrefabInstancePropertyModifications(meshComp);
                     }
-                    CheckComponents(_targetObject);
+                    CheckComponents(_target.Object);
                     PrepareObject();
                 }
                 return true;
@@ -668,13 +683,13 @@ namespace DAPolyPaint
         /// </summary>
         private void OnGUI_TexturePalette()
         {
-            if (_targetTexture)
+            if (_target.Tex)
             {
                 var texWidth = EGU.currentViewWidth;
 
                 var rt = EGL.GetControlRect(false, texWidth);
                 rt.height = rt.width;
-                EditorGUI.DrawPreviewTexture(rt, _targetTexture);
+                EditorGUI.DrawPreviewTexture(rt, _target.Tex);
                 var rtCursor = new Vector2(rt.x, rt.y);
                 rtCursor.x += _lastUVpick.x * rt.width;
                 rtCursor.y += (1 - _lastUVpick.y) * rt.height;
@@ -701,7 +716,7 @@ namespace DAPolyPaint
 
                 //current colors
                 var cRect = EGL.GetControlRect(false, EGU.singleLineHeight);
-                if (_currToolCode == ToolType.pick && _lastFace != -1)
+                if (_currToolCode == ToolType.pick && _currFace != -1)
                 {
                     cRect.width = cRect.width / 2;
                     EditorGUI.DrawRect(cRect, _lastPixelColor);
@@ -735,10 +750,10 @@ namespace DAPolyPaint
             }
             EditorGUI.DrawRect(statusColorRect, statusColor);
             var s = "";
-            if (_targetObject == null) s = "Object: None selected";
+            if (_target.Object == null) s = "Object: None selected";
             else
             {
-                s = _targetObject.name;
+                s = _target.Object.name;
                 if (!check.isOk) s += ": Issues...";
             }
 
@@ -765,17 +780,17 @@ namespace DAPolyPaint
             var info = "";
             var s = "";
             var isOk = true;
-            if (_targetMesh == null)
+            if (_target.Mesh == null)
             {
                 s = "NOT FOUND";
                 isOk = false;
-                if (_targetObject != null)
+                if (_target.Object != null)
                 {
                     var childNameWithMesh = "";
-                    var m = _targetObject.GetComponentInChildren<MeshRenderer>();
+                    var m = _target.Object.GetComponentInChildren<MeshRenderer>();
                     if (m == null)
                     {
-                        var ms = _targetObject.GetComponentInChildren<SkinnedMeshRenderer>();
+                        var ms = _target.Object.GetComponentInChildren<SkinnedMeshRenderer>();
                         if (ms != null) childNameWithMesh = ms.gameObject.name;
                     } else
                     {
@@ -792,14 +807,14 @@ namespace DAPolyPaint
             }
 
             info += "Mesh: " + s;
-            if (_targetTexture == null) { s = "NOT FOUND"; isOk = false; } else s = _targetTexture.name;
+            if (_target.Tex == null) { s = "NOT FOUND"; isOk = false; } else s = _target.Tex.name;
             info += "\nTex: " + s;
             if (isOk)
             {
                 //info += "\nFace: " + _lastFace.ToString();
                 //info += "\nSetUVs calls: " + _painter.NumUVCalls.ToString();
-                info += "\nSkinned: " + _skinned.ToString();
-                info += "\nMultimaterial:" + (_targetMesh.subMeshCount > 1).ToString();
+                info += "\nSkinned: " + _target.Skinned.ToString();
+                info += "\nMultimaterial:" + (_target.Mesh.subMeshCount > 1).ToString();
             }
             return (isOk, info);
         }
@@ -859,9 +874,9 @@ namespace DAPolyPaint
         /// </summary>
         private void DoFaceHit(SceneView sv, Vector2 currMousePos)
         {
-            _prevFace = _lastFace;
+            _prevFace = _currFace;
             _prevFace_Mirror = _lastFace_Mirror;
-            (_lastFace, _lastFace_Mirror)  = GetFaceHit(sv, currMousePos, _ui.MirrorCursor && (_currToolCode != ToolType.pick) );      
+            (_currFace, _lastFace_Mirror)  = GetFaceHit(sv, currMousePos, _ui.MirrorCursor && (_currToolCode != ToolType.pick) );      
         }
 
         /// <summary>
@@ -872,7 +887,7 @@ namespace DAPolyPaint
         {
             int result = -1;
             int result_mirror = -1;
-            if (_targetMesh != null)
+            if (_target.Mesh != null)
             {
 
                 _currMousePosCam = currMousePos;
@@ -920,10 +935,10 @@ namespace DAPolyPaint
 
         Vector3 MirrorFromPivot(Vector3 vec, bool isPosition = true) 
         { 
-            var plane = PolyPaintWindow.AxisDirection(_ui.CurrMirrorAxis, _targetObject.transform);
+            var plane = PolyPaintWindow.AxisDirection(_ui.CurrMirrorAxis, _target.Object.transform);
             Vector3 offset = plane * _ui.AxisOffset;
 
-            var origin = _targetObject.transform.position + offset;
+            var origin = _target.Object.transform.position + offset;
             if (isPosition)
             {
                 return Vector3.Reflect(vec - origin, plane) + origin;
@@ -1062,13 +1077,13 @@ namespace DAPolyPaint
         {
             DoFaceHit(scene, ev.mousePosition);
 
-            if (_currToolCode == ToolType.pick && _lastFace != -1)
+            if (_currToolCode == ToolType.pick && _currFace != -1)
             {
                 TryPick(_lastHit);
                 Repaint();
             }
 
-            if (_lastFace != _prevFace)
+            if (_currFace != _prevFace)
                 BuildCursor();
 
             scene.Repaint();
@@ -1112,7 +1127,7 @@ namespace DAPolyPaint
         {
             AcquireInput(ev, id);
             _isMousePressed = true;
-            if (_targetMesh != null)
+            if (_target.Mesh != null)
             {
                 DoFaceHit(scene, ev.mousePosition);
                 BuildCursor();
@@ -1122,7 +1137,7 @@ namespace DAPolyPaint
                 }
                 else if (tool == ToolType.pick)
                 {
-                    PickFromSurface(_lastFace);
+                    PickFromSurface(_currFace);
                 }
                 else if (tool == ToolType.brush) PaintUsingCursor();
 
@@ -1132,11 +1147,11 @@ namespace DAPolyPaint
 
         private void ToolFillMouseDown()
         {
-            var anyFace = _lastFace >= 0;
+            var anyFace = _currFace >= 0;
             var anyMirror = (_ui.MirrorCursor && _lastFace_Mirror >= 0);
             if (anyFace || anyMirror)
             {
-                if (anyFace) DoFillTool(_lastFace, _lastUVpick);
+                if (anyFace) DoFillTool(_currFace, _lastUVpick);
                 if (anyMirror) DoFillTool(_lastFace_Mirror, _lastUVpick);
                 _painter.Undo_SaveState();
                 if (_ui.ToolAction > 0 )
@@ -1149,7 +1164,7 @@ namespace DAPolyPaint
         private void DoMouseDrag(SceneView scene, Event ev, int tool)
         {
             DoFaceHit(scene, ev.mousePosition);
-            if (_lastFace != _prevFace)
+            if (_currFace != _prevFace)
             {
                 BuildCursor();
                 if (_isMousePressed)
@@ -1160,7 +1175,7 @@ namespace DAPolyPaint
                     }
                     else if (tool == ToolType.pick)
                     {
-                        PickFromSurface(_lastFace);
+                        PickFromSurface(_currFace);
                     }
                     else if (tool == ToolType.brush)
                     { 
@@ -1175,7 +1190,7 @@ namespace DAPolyPaint
 
         private void ToolLoopMouseDrag()
         {
-            BuildLoopCursor(_prevFace, _lastFace, true);
+            BuildLoopCursor(_prevFace, _currFace, true);
             if (_ui.MirrorCursor) BuildLoopCursor(_prevFace_Mirror, _lastFace_Mirror, false);
         }
 
@@ -1241,28 +1256,6 @@ namespace DAPolyPaint
             }
         }
 
-        /// <summary>
-        /// Populates a list with the vertex positions of a specified mesh face.
-        /// </summary>
-        public void GetFaceVerts(int face, List<Vector3> verts)
-        {
-            verts.Clear();
-            if (face != -1)
-            {
-                if (_skinAffected == null)
-                {
-                    verts.Add(_vertices[face * 3]);
-                    verts.Add(_vertices[face * 3 + 1]);
-                    verts.Add(_vertices[face * 3 + 2]);
-                }
-                else
-                {
-                    verts.Add(_verticesSkinned[face * 3]);
-                    verts.Add(_verticesSkinned[face * 3 + 1]);
-                    verts.Add(_verticesSkinned[face * 3 + 2]);
-                }
-            }
-        }
 
         /// <summary>
         /// Populates a list with the world-space vertex positions of a specified mesh face,
@@ -1273,17 +1266,17 @@ namespace DAPolyPaint
             verts.Clear();
             if (face != -1)
             {
-                if (_skinAffected == null)
+                if (!_target.Skinned)
                 {
-                    verts.Add(transformMat.MultiplyPoint3x4(_vertices[face * 3]));
-                    verts.Add(transformMat.MultiplyPoint3x4(_vertices[face * 3 + 1]));
-                    verts.Add(transformMat.MultiplyPoint3x4(_vertices[face * 3 + 2]));
+                    verts.Add(transformMat.MultiplyPoint3x4(_target.Vertices[face * 3]));
+                    verts.Add(transformMat.MultiplyPoint3x4(_target.Vertices[face * 3 + 1]));
+                    verts.Add(transformMat.MultiplyPoint3x4(_target.Vertices[face * 3 + 2]));
                 }
                 else
                 {
-                    verts.Add(transformMat.MultiplyPoint3x4(_verticesSkinned[face * 3]));
-                    verts.Add(transformMat.MultiplyPoint3x4(_verticesSkinned[face * 3 + 1]));
-                    verts.Add(transformMat.MultiplyPoint3x4(_verticesSkinned[face * 3 + 2]));
+                    verts.Add(transformMat.MultiplyPoint3x4(_target.VerticesSkinned[face * 3]));
+                    verts.Add(transformMat.MultiplyPoint3x4(_target.VerticesSkinned[face * 3 + 1]));
+                    verts.Add(transformMat.MultiplyPoint3x4(_target.VerticesSkinned[face * 3 + 2]));
                 }
             }
         }
@@ -1309,7 +1302,7 @@ namespace DAPolyPaint
             foreach (var f in loop)
             {
                 var poly = new PolyFace();
-                GetFaceVerts(f, poly, _targetObject.transform.localToWorldMatrix);
+                GetFaceVerts(f, poly, _target.Object.transform.localToWorldMatrix);
                 poly.FaceNum = f;
                 PaintCursorDrawer.PolyCursor.Add(poly);
             }
@@ -1345,7 +1338,7 @@ namespace DAPolyPaint
         private PolyFace CreatePoly(int faceNum)
         {
             var poly = new PolyFace();
-            GetFaceVerts(faceNum, poly, _targetObject.transform.localToWorldMatrix);
+            GetFaceVerts(faceNum, poly, _target.Object.transform.localToWorldMatrix);
             poly.FaceNum = faceNum;
             return poly;
         }
@@ -1356,12 +1349,12 @@ namespace DAPolyPaint
         private void BuildCursor()
         {
             PaintCursorDrawer.PolyCursor.Clear();
-            if (_lastFace >= 0)
+            if (_currFace >= 0)
             {                
-                PaintCursorDrawer.PolyCursor.Add(CreatePoly(_lastFace));
+                PaintCursorDrawer.PolyCursor.Add(CreatePoly(_currFace));
                 if (_ui.AutoQuads && (_currToolCode == ToolType.brush || _currToolCode == ToolType.loop))
                 {
-                    var quadBro = _painter.FindQuad(_lastFace);
+                    var quadBro = _painter.FindQuad(_currFace);
                     if (quadBro != -1)
                     {                        
                         PaintCursorDrawer.PolyCursor.Add(CreatePoly(quadBro));
@@ -1386,16 +1379,16 @@ namespace DAPolyPaint
         {
             if (_paintingMode) return;
             
-            _targetObject = Selection.activeGameObject;
-            if (_targetObject != null)
+            _target.Object = Selection.activeGameObject;
+            if (_target.Object != null)
             {
-                CheckComponents(_targetObject);
+                CheckComponents(_target.Object);
             }
             else
             {
-                _targetMesh = null;
-                _targetTexture = null;
-                _textureData = null;
+                _target.Mesh = null;
+                _target.Tex = null;
+                _target.TexData = null;
             }
             Repaint();
         }
@@ -1406,38 +1399,38 @@ namespace DAPolyPaint
         /// </summary>
         private void CheckComponents(GameObject target)
         {
-            _skinned = false;
+            _target.Skinned = false;
             var solid = target.GetComponent<MeshFilter>();
             var skinned = target.GetComponent<SkinnedMeshRenderer>();
             if (solid != null)
             {
-                _targetMesh = solid.sharedMesh;
+                _target.Mesh = solid.sharedMesh;
             }
             else if (skinned != null)
             {
-                _targetMesh = skinned.sharedMesh;
-                _skinned = true;
+                _target.Mesh = skinned.sharedMesh;
+                _target.Skinned = true;
             }
             else
             {
-                _targetMesh = null;
+                _target.Mesh = null;
             }
 
             var r = target.GetComponent<Renderer>();
             if (r != null)
             {
-                _targetTexture = null;
-                _textureData = null;
-                (_targetMaterial, _targetTexture) = GetFirstValidMaterialTexture(r);
-                if (_targetTexture != null)
+                _target.Tex = null;
+                _target.TexData = null;
+                (_target.Mat, _target.Tex) = GetFirstValidMaterialTexture(r);
+                if (_target.Tex != null)
                 {
-                    _textureData = ToTexture2D(_targetTexture);
+                    _target.TexData = ToTexture2D(_target.Tex);
                 }
             }
             else
             {
-                _targetTexture = null;
-                _textureData = null;
+                _target.Tex = null;
+                _target.TexData = null;
             }
         }
 
@@ -1463,29 +1456,28 @@ namespace DAPolyPaint
         /// </summary>
         void PrepareObject()
         {
-            if (_targetMesh != null)
+            if (_target.Mesh != null)
             {                
-                (_dummyObject, _dummyCollider) = GetDummy(_targetObject);
-                LogMeshInfo(_targetMesh);                
-                _painter.SetMeshAndRebuild(_targetMesh, _skinned, _textureData);
-                _vertices = _targetMesh.vertices;
-                if (!_skinned)
+                (_dummyObject, _dummyCollider) = GetDummy(_target.Object);
+                LogMeshInfo(_target.Mesh);                
+                _painter.SetMeshAndRebuild(_target.Mesh, _target.Skinned, _target.TexData);
+                _target.Vertices = _target.Mesh.vertices;
+                if (!_target.Skinned)
                 {
-                    _dummyCollider.sharedMesh = _targetMesh;
+                    _dummyCollider.sharedMesh = _target.Mesh;
                 }
                 else
                 {
                     //snapshoting the skinned mesh so we can paint over a mesh distorted by bone transformations.
-                    var smr = _targetObject.GetComponent<SkinnedMeshRenderer>();
+                    var smr = _target.Object.GetComponent<SkinnedMeshRenderer>();
                     var snapshot = new Mesh();
                     smr.BakeMesh(snapshot, true);
                     _dummyCollider.sharedMesh = snapshot;
 
-                    _skinAffected = snapshot;
-                    _verticesSkinned = snapshot.vertices;
+                    _target.VerticesSkinned = snapshot.vertices;
                 }
-                _lastFace = -1;                                
-                _paintCursor.TargetMesh = _targetMesh;
+                _currFace = -1;                                
+                _paintCursor.TargetMesh = _target.Mesh;
                 _paintCursor.enabled = true;
             }
             else
