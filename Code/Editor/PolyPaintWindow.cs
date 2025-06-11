@@ -100,6 +100,8 @@ namespace DAPolyPaint
             public bool SavedSceneLighting;
             public bool SavedSceneViewDrawGizmos;
             public int ToolAction;
+            public bool SettingsFolded;
+            public bool UseSharedMesh;
 
             public void Load(string windowNamePrefix)
             {
@@ -114,6 +116,7 @@ namespace DAPolyPaint
                 AutoSwitchMaterial = EditorPrefs.GetBool(windowNamePrefix + "_autoSwitchMaterial", true);
                 AutoShadedWireframe = EditorPrefs.GetBool(windowNamePrefix + "_autoShadedWireframe", true);
                 ToolsFoldedOut = EditorPrefs.GetBool(windowNamePrefix + "_toolsFoldedOut", true);
+                UseSharedMesh = EditorPrefs.GetBool(windowNamePrefix + "_useSharedMesh", true);
             }
 
             public void Save(string windowNamePrefix)
@@ -128,6 +131,7 @@ namespace DAPolyPaint
                 EditorPrefs.SetBool(windowNamePrefix + "_autoSwitchMaterial", AutoSwitchMaterial);
                 EditorPrefs.SetBool(windowNamePrefix + "_autoShadedWireframe", AutoShadedWireframe);
                 EditorPrefs.SetBool(windowNamePrefix + "_toolsFoldedOut", ToolsFoldedOut);
+                EditorPrefs.SetBool(windowNamePrefix + "_useSharedMesh", UseSharedMesh);
             }
         }
 
@@ -321,10 +325,19 @@ namespace DAPolyPaint
                 OnGUI_Remapping();                
             }
 
+            OnGUI_Settings();
+
             EGL.EndScrollView();
 
         }
 
+        private void OnGUI_Settings()
+        {
+            GL.BeginVertical(EditorStyles.textArea);
+            _ui.SettingsFolded = EGL.BeginFoldoutHeaderGroup(_ui.SettingsFolded, "Settings");
+            _ui.UseSharedMesh = EGL.ToggleLeft("Use <renderer>.sharedMesh", _ui.UseSharedMesh);
+            GL.EndVertical();
+        }
 
         private void OnGUI_UndoRedo()
         {
