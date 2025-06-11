@@ -314,8 +314,7 @@ namespace DAPolyPaint
 
             OnGUI_ObjectStatus();
             OnGUI_TexturePalette();
-
-            _ui.AutoShadedWireframe = EGL.ToggleLeft(Temp.Content("Auto-Shaded Wireframe", "Set Shaded Wrieframe and Camera lighting on Paint Mode"), _ui.AutoShadedWireframe);
+            
 
             //Painting tools
             using (new EditorGUI.DisabledScope(!_paintingMode))
@@ -328,16 +327,17 @@ namespace DAPolyPaint
             }
 
             OnGUI_Settings();
-
             EGL.EndScrollView();
-
         }
 
         private void OnGUI_Settings()
         {
             GUL.BeginVertical(EditorStyles.textArea);
             _ui.SettingsFolded = EGL.BeginFoldoutHeaderGroup(_ui.SettingsFolded, "Settings");
-            GUILayout.Toggle(true, "options[i]", EditorStyles.radioButton);
+            if (_ui.SettingsFolded)
+            {
+                _ui.AutoShadedWireframe = EGL.ToggleLeft(Temp.Content("Auto-Shaded Wireframe", "Set Shaded Wrieframe and Camera lighting on Paint Mode"), _ui.AutoShadedWireframe);
+            }
             GUL.EndVertical();
         }
 
@@ -487,6 +487,20 @@ namespace DAPolyPaint
             PaintCursorDrawer.ShadeSelected = _ui.ShadeSelection;
             _ui.RestrictToSelected = EGL.ToggleLeft("Restrict painting to selected", _ui.RestrictToSelected);
             _painter.RestrictToSelected = _ui.RestrictToSelected;
+            if (GUL.Button("Move Away"))
+            {
+                _painter.MoveFaces(_painter.SelectedFaces, new Vector3(1, 0, 0));
+                _dummyCollider.sharedMesh = _painter.Target;
+                RebuildSelection();
+                SceneView.lastActiveSceneView.Repaint();
+            }
+            if (GUL.Button("Restore mesh"))
+            {
+                _painter.RestoreVertices();
+                _dummyCollider.sharedMesh = _painter.Target;
+                RebuildSelection();
+                SceneView.lastActiveSceneView.Repaint();
+            }
         }
 
         private void OnGUI_InputEvents()
@@ -1321,7 +1335,7 @@ namespace DAPolyPaint
             foreach (var f in loop)
             {
                 var poly = new PolyFace();
-                GetFaceVerts(f, poly, _target.Object.transform.localToWorldMatrix);
+                _painter.GetFaceVerts(f, poly, _target.Object.transform.localToWorldMatrix);
                 poly.FaceNum = f;
                 PaintCursorDrawer.PolyCursor.Add(poly);
             }
@@ -1357,7 +1371,7 @@ namespace DAPolyPaint
         private PolyFace CreatePoly(int faceNum)
         {
             var poly = new PolyFace();
-            GetFaceVerts(faceNum, poly, _target.Object.transform.localToWorldMatrix);
+            _painter.GetFaceVerts(faceNum, poly, _target.Object.transform.localToWorldMatrix);
             poly.FaceNum = faceNum;
             return poly;
         }

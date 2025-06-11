@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
+using static UnityEngine.GraphicsBuffer;
 
  
 namespace DAPolyPaint 
@@ -18,10 +19,11 @@ namespace DAPolyPaint
         bool _skinned;
         List<Vector2> _UVs;
         Vector3[] _vertices;            //all non optimized vertices of the actual mesh
+        Vector3[] _verticesBackup;
         Vector3[] _indexedVerts;
-        private List<int>[] _facesUsingVert;
-        int[] _triangles;
-        int[] _indexedFaces;
+        List<int>[] _facesUsingVert;
+        int[] _triangles;               // the raw mesh triangles (one‐to‐one per duplicated vertex) points to _vertices
+        int[] _indexedFaces;            // triangles pointing to indexed vertices _indexedVerts
         float[] _angles;                //angle of each triangle corners
         List<FaceLink>[] _AllFaceConnections;
         FaceLink[,] _faceConnectionsBySide;
@@ -29,10 +31,10 @@ namespace DAPolyPaint
         HashSet<int> _selectedFaces = new HashSet<int>();
         HashSet<int> _hiddenFaces = new HashSet<int>();
         int _undoPos;
-        private int _undoSequenceCount;
+        int _undoSequenceCount;
         int _channel = 0;
         Texture2D _textureData;
-        private MeshCopy _oldMesh;
+        MeshCopy _oldMesh;
 
         public ToolAction ToolAction { get; set; }
         public Mesh Target { get { return _targetMesh; } }
@@ -42,6 +44,7 @@ namespace DAPolyPaint
         public float QuadTolerance { get; set; }
         public HashSet<int> SelectedFaces { get { return _selectedFaces; } }
         public bool RestrictToSelected { get; set; } = true;
+        public Vector3[] Vertices { get { return _vertices; }}
 
         public Painter()
         {
@@ -98,6 +101,7 @@ namespace DAPolyPaint
 
             _UVs = newUVs; //keep ref for painting
             _vertices = newVertices.ToArray();
+            _verticesBackup = newVertices.ToArray();
             _triangles = newTris.ToArray();
 
 
@@ -190,112 +194,6 @@ namespace DAPolyPaint
             _facesUsingVert = facesUsingVert.ToArray();
 
             //Tested with casual_Female_G model when from 4k verts to originallly 824 verts, just like 3ds Max version.
-            //Debug.Log(String.Format("NumVerts before:{0} after:{1} dumbSymmetryTest:{2}", NumVerts, sharedVerts.Count, dumbSymmetryTest));
-        }
-
-        //no-Dictionary version of Indexify (200x slower)
-        private void Indexify_noDic()
-        {
-            var sharedVerts = new List<Vector3>();
-            var indexReplace = new int[_triangles.Length];
-            var facesUsingVert = new List<List<int>>();
-            _indexedFaces = new int[_triangles.Length];
-            var dumbSymmetryTest = 0;
-
-            for (int i = 0; i < NumVerts; i++)
-            {
-                var v = _vertices[i];
-                var idx = sharedVerts.FindIndex(x => x == v);
-
-                if (idx == -1)
-                {
-                    idx = sharedVerts.Count;
-                    sharedVerts.Add(v);
-                    var list = new List<int>();
-                    list.Add(i / 3);
-                    facesUsingVert.Add(list);
-                    if (v.x > 0) dumbSymmetryTest++; else if (v.x < 0) dumbSymmetryTest--;
-                }
-                indexReplace[i] = idx;
-                facesUsingVert[idx].Add(i / 3);
-            }
-
-            for (int i = 0; i < _triangles.Length; i++)
-            {
-                _indexedFaces[i] = indexReplace[_triangles[i]];
-            }
-            _indexedVerts = sharedVerts.ToArray();
-            _facesUsingVert = facesUsingVert.ToArray();
-
-            //Debug.Log(String.Format("NumVerts before:{0} after:{1} dumbSymmetryTest:{2}", NumVerts, sharedVerts.Count, dumbSymmetryTest));
-        }
-
-        //bounding box check version of Indexify 
-        private void Indexify_boundBox()
-        {
-            var sharedVerts = new List<Vector3>();
-            var indexReplace = new int[_triangles.Length];
-            var facesUsingVert = new List<List<int>>();
-            _indexedFaces = new int[_triangles.Length];
-            var dumbSymmetryTest = 0;
-            Vector3 minBox, maxBox;
-            if (NumVerts > 0)
-            {
-                minBox = _vertices[0];
-                maxBox = _vertices[0];
-                sharedVerts.Add(_vertices[0]);
-                var list = new List<int>();
-                facesUsingVert.Add(list);
-                indexReplace[0] = 0;
-                facesUsingVert[0].Add(0);
-            } else return;
-
-            bool boundBoxContains(Vector3 point)
-            {
-                return point.x >= minBox.x && point.y >= minBox.y && point.z >= minBox.z &&
-                       point.x <= maxBox.x && point.y <= maxBox.y && point.z <= maxBox.z;
-            }
-
-            void boundBoxEncapsulate(Vector3 point)
-            {
-                if (point.x < minBox.x) minBox.x = point.x;
-                if (point.y < minBox.y) minBox.y = point.y;
-                if (point.z < minBox.z) minBox.z = point.z;
-                if (point.x > maxBox.x) maxBox.x = point.x;
-                if (point.y > maxBox.y) maxBox.y = point.y;
-                if (point.z > maxBox.z) maxBox.z = point.z;
-            }
-
-            for (int i = 1; i < NumVerts; i++)
-            {
-                var v = _vertices[i];
-                int idx = -1;
-                if (boundBoxContains(v))
-                {
-                    idx = sharedVerts.FindIndex(x => x == v);
-                }
-
-                if (idx == -1)
-                {
-                    idx = sharedVerts.Count;
-                    sharedVerts.Add(v);
-                    boundBoxEncapsulate(v);
-                    var list = new List<int>();
-                    list.Add(i / 3);
-                    facesUsingVert.Add(list);
-                    if (v.x > 0) dumbSymmetryTest++; else if (v.x < 0) dumbSymmetryTest--;
-                }
-                indexReplace[i] = idx;
-                facesUsingVert[idx].Add(i / 3);
-            }
-
-            for (int i = 0; i < _triangles.Length; i++)
-            {
-                _indexedFaces[i] = indexReplace[_triangles[i]];
-            }
-            _indexedVerts = sharedVerts.ToArray();
-            _facesUsingVert = facesUsingVert.ToArray();
-
             //Debug.Log(String.Format("NumVerts before:{0} after:{1} dumbSymmetryTest:{2}", NumVerts, sharedVerts.Count, dumbSymmetryTest));
         }
 
@@ -551,7 +449,6 @@ namespace DAPolyPaint
                 case ToolAction.SelectSub:
                     _selectedFaces.Remove(face);
                     break;
-
             }
         }
 
@@ -559,6 +456,17 @@ namespace DAPolyPaint
         public void RefreshUVs()
         {
             _targetMesh.SetUVs(_channel, _UVs);
+        }
+
+        public void MoveFaces(HashSet<int> faces, Vector3 vec)
+        {
+            foreach (var face in faces)
+            {
+                _vertices[_triangles[face * 3]] += vec;
+                _vertices[_triangles[face * 3+1]] += vec;
+                _vertices[_triangles[face * 3+2]] += vec;
+            }
+            _targetMesh.SetVertices(_vertices);
         }
 
         //A face actually have 3 UV values but, here all are the same
@@ -934,7 +842,22 @@ namespace DAPolyPaint
             return true;
         }
 
+        public void GetFaceVerts(int face, List<Vector3> verts, Matrix4x4 transformMat)
+        {
+            verts.Clear();
+            if (face > -1)
+            {
+                    verts.Add(transformMat.MultiplyPoint3x4(_vertices[face * 3]));
+                    verts.Add(transformMat.MultiplyPoint3x4(_vertices[face * 3 + 1]));
+                    verts.Add(transformMat.MultiplyPoint3x4(_vertices[face * 3 + 2]));
+            }
+        }
 
+        public void RestoreVertices()
+        {
+            Array.Copy(_verticesBackup, _vertices, Vertices.Length);
+            _targetMesh.SetVertices(_vertices);
+        }
     }
 
     /// <summary>
