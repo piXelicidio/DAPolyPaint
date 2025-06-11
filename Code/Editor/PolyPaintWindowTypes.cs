@@ -48,10 +48,12 @@ namespace DAPolyPaint
         public static int MirrorAxis { get; set; }
         public static bool ShowMirrorPlane { get; set; }
         public static float AxisOffset { get; set; }
+        public static bool ShadeSelected { get; set; }
         public static PolyList SelectedFaces { get { return _selectedFaces; } } 
         public static PolyList PolyCursor { get { return _polyCursor; } }
         public static CursorRay[] CursorRays = new CursorRay[2];
         private static Vector3[] _mirrorPlane = new Vector3[5];
+        private static Color SelColor = new Color(1f, 0.4f, 0f, 0.6f).linear;
 
         public PaintCursorDrawer()
         { 
@@ -71,7 +73,43 @@ namespace DAPolyPaint
             {
                 DrawMirrorPlane(obj);
             }
-            DrawSelected();        }
+            DrawSelected();        
+        }
+
+        private static void DrawPolyIfFacing(Vector3[] verts, Color frontColor, Color backColor = default)
+        {
+            if (verts.Length < 3) return;
+
+            // 1. Compute normal (assuming verts are in world space, and convex)
+            Vector3 e1 = verts[1] - verts[0];
+            Vector3 e2 = verts[2] - verts[0];
+            Vector3 normal = Vector3.Cross(e1, e2).normalized;
+
+            // 2. Find center of polygon
+            Vector3 center = verts[0];
+
+            // 3. Get SceneView camera direction
+            var cam = SceneView.currentDrawingSceneView.camera;
+            Vector3 viewDir = (center - cam.transform.position).normalized;
+
+            // 4. Dot to see if front-facing
+            float dot = Vector3.Dot(normal, viewDir);
+
+            // 5. Choose color (or skip if back-facing)
+            if (dot <= 0f)
+            {
+                Handles.color = frontColor;
+            }
+            else
+            {
+                if (backColor == default)
+                    return;             // cull
+                Handles.color = backColor;
+            }
+
+            // 6. Draw it!
+            Handles.DrawAAConvexPolygon(verts);
+        }
 
         private static void DrawSelected()
         {
@@ -80,13 +118,15 @@ namespace DAPolyPaint
                 var poly = _selectedFaces[p];
                 if (poly.Count > 2)
                 {
-                    Handles.color = new Color(1f, 0.4f, 0f).linear;
+                    Handles.color = SelColor;
                     Vector3 a = poly[0];
                     Vector3 b = poly[1];
                     Vector3 c = poly[2];
                     Vector3 d = poly[0];
-                    Handles.DrawPolyLine(new Vector3[] { a, b, c, d });
-                    //Handles.DrawDottedLines(new Vector3[] { a, b, c, d }, 2f);
+                    //Handles.DrawAAConvexPolygon(a, b, c);
+                    if (ShadeSelected) DrawPolyIfFacing(new Vector3[] { a, b, c }, SelColor); 
+                    Handles.DrawPolyLine(new Vector3[] { a, b, c, d });                    
+                    
                 }
             }
         }

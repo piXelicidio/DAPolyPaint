@@ -41,6 +41,7 @@ namespace DAPolyPaint
         public int NumVerts { get { return _vertices.Length; } }
         public float QuadTolerance { get; set; }
         public HashSet<int> SelectedFaces { get { return _selectedFaces; } }
+        public bool RestrictToSelected { get; set; } = true;
 
         public Painter()
         {
@@ -535,7 +536,7 @@ namespace DAPolyPaint
             {
                 case ToolAction.Paint:
                     if (face >= 0) {
-                        if ((_selectedFaces.Count == 0) || (_selectedFaces.Count > 0 && _selectedFaces.Contains(face)) )
+                        if (!RestrictToSelected || _selectedFaces.Count == 0 || _selectedFaces.Contains(face) )
                         {
                             _UVs[face * 3] = uvc;
                             _UVs[face * 3 + 1] = uvc;
