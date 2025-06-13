@@ -28,6 +28,7 @@ namespace DAPolyPaint
             public Texture Tex;
             public Texture2D TexData;
             public Material Mat;
+            internal Mesh SkinnedMesh;
         }  
 
         #endregion
@@ -102,9 +103,11 @@ namespace DAPolyPaint
             public bool SettingsFolded;
             public bool ShadeSelection;
             public bool RestrictToSelected;
+            internal Vector3 MoveOffset;
 
             public void Load(string windowNamePrefix)
             {
+                MoveOffset = new Vector3(1, 0, 0);
                 ObjectInfoFoldout = EditorPrefs.GetBool(windowNamePrefix + "_objectInfoFoldout", true);
 
                 FillVariant = EditorPrefs.GetInt(windowNamePrefix + "_fillVariant", 0);
@@ -236,6 +239,7 @@ namespace DAPolyPaint
             }
             else
             {
+                RestoreSkinned();
                 _paintingMode = false;
                 SceneView.lastActiveSceneView.Repaint();
                 PaintCursorDrawer.PaintMode = false;
@@ -489,11 +493,12 @@ namespace DAPolyPaint
             _painter.RestrictToSelected = _ui.RestrictToSelected;
             if (GUL.Button("Move Away"))
             {
-                _painter.MoveFaces(_painter.SelectedFaces, new Vector3(1, 0, 0));
+                _painter.MoveFaces(_painter.SelectedFaces, _ui.MoveOffset);
                 _dummyCollider.sharedMesh = _painter.Target;
                 RebuildSelection();
                 SceneView.lastActiveSceneView.Repaint();
             }
+            //_ui.MoveOffset = EGL.Vector3Field("Offset", _ui.MoveOffset);
             if (GUL.Button("Restore mesh"))
             {
                 _painter.RestoreVertices();
@@ -590,6 +595,7 @@ namespace DAPolyPaint
         /// </summary>
         public bool SaveMeshAsset(bool optimizeMesh = false, bool forceNewFileName = false)
         {
+            RestoreSkinned();
             var currentMeshFile = AssetDatabase.GetAssetPath(_target.Mesh);
             Debug.Log(currentMeshFile);
             var projectPath = Path.GetDirectoryName(Application.dataPath);
@@ -670,38 +676,6 @@ namespace DAPolyPaint
                 }
                 return true;
             }
-        }
-
-        //TODO: feeling unused, might delete later
-        public Mesh SaveMeshToFile(Mesh mesh, string fileName, bool createNewInstance = false, bool optimizeMesh = false, bool nameIsFullPath = false)
-        {
-            string filePath = fileName;
-            if (!nameIsFullPath)
-            {
-                // Show the save file dialog and get the file path
-                filePath = EditorUtility.SaveFilePanel("Save Modified Mesh Asset", "Assets/", fileName, "asset");
-            }
-            if (!string.IsNullOrEmpty(filePath))
-            {
-                if (!nameIsFullPath) filePath = FileUtil.GetProjectRelativePath(filePath);
-
-                // Create a new instance or use the same mesh
-                Mesh meshToSave = (createNewInstance) ? Instantiate(mesh) as Mesh : mesh;
-
-                if (optimizeMesh) MeshUtility.Optimize(meshToSave);
-
-                // Create the asset and save it to the file
-
-
-                AssetDatabase.CreateAsset(meshToSave, filePath);
-                AssetDatabase.SaveAssets();
-                AssetDatabase.Refresh();
-                //Debug.Log("to: " + filePath);
-                Type assetType = AssetDatabase.GetMainAssetTypeAtPath(filePath);
-                //Debug.Log("Type: " + assetType);
-                return (AssetDatabase.LoadAssetAtPath<Mesh>(filePath));
-            }
-            return null;
         }
 
 
@@ -1440,15 +1414,16 @@ namespace DAPolyPaint
             if (targetGO == null) return t;
             t.Object = targetGO;
             t.Skinned = false;
+            t.SkinnedMesh = null;
             var solid = targetGO.GetComponent<MeshFilter>();
             var skinned = targetGO.GetComponent<SkinnedMeshRenderer>();
             if (solid != null)
             {
-                t.Mesh = solid.sharedMesh;
+                t.Mesh = solid.sharedMesh;                
             }
             else if (skinned != null)
             {
-                t.Mesh = skinned.sharedMesh;
+                t.Mesh = skinned.sharedMesh;                
                 t.Skinned = true;
             }
             else
@@ -1500,23 +1475,24 @@ namespace DAPolyPaint
             if (target.Mesh != null)
             {                
                 (_dummyObject, _dummyCollider) = GetDummy(target.Object);
-                LogMeshInfo(target.Mesh);                
-                painter.SetMeshAndRebuild(target.Mesh, target.Skinned, target.TexData);
-                target.Vertices = target.Mesh.vertices;
-                if (!target.Skinned)
+                LogMeshInfo(target.Mesh);
+                if (target.Skinned)
                 {
-                    _dummyCollider.sharedMesh = target.Mesh;
-                }
-                else
-                {
-                    //snapshoting the skinned mesh so we can paint over a mesh distorted by bone transformations.
                     var smr = target.Object.GetComponent<SkinnedMeshRenderer>();
                     var snapshot = new Mesh();
                     smr.BakeMesh(snapshot, true);
-                    _dummyCollider.sharedMesh = snapshot;
-
-                    target.VerticesSkinned = snapshot.vertices;
+                    target.SkinnedMesh = target.Mesh;
+                    target.Mesh = snapshot;
+                    smr.enabled = false;
+                    var mf = target.Object.AddComponent<MeshFilter>();
+                    mf.sharedMesh = snapshot;
+                    var mr = target.Object.AddComponent<MeshRenderer>();
+                    mr.sharedMaterials = smr.sharedMaterials;                    
                 }
+                painter.SetMeshAndRebuild(target.Mesh, target.SkinnedMesh, target.TexData);
+                target.Vertices = target.Mesh.vertices;
+                _dummyCollider.sharedMesh = target.Mesh;
+                
                 _currFace = -1;                                
                 _paintCursor.TargetMesh = target.Mesh;
                 _paintCursor.enabled = true;
@@ -1524,6 +1500,23 @@ namespace DAPolyPaint
             else
             {
                 Debug.LogWarning("targetMeshs should be valid before calling PrepareObject()");
+            }
+        }
+
+        void RestoreSkinned()
+        {
+            if (_target.SkinnedMesh != null) 
+            {
+                _painter.UpdateSkinnedUVS();
+                var smr = _target.Object.GetComponent<SkinnedMeshRenderer>();
+                smr.sharedMesh = _target.SkinnedMesh;
+                smr.enabled = true;
+                var mf = _target.Object.GetComponent<MeshFilter>();
+                if (mf != null) DestroyImmediate(mf);                
+                var mr = _target.Object.GetComponent<MeshRenderer>();
+                if (mr != null) DestroyImmediate(mr);
+                _target.Mesh = _target.SkinnedMesh;
+                _target.SkinnedMesh = null;
             }
         }
 

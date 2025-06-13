@@ -16,7 +16,7 @@ namespace DAPolyPaint
     public class Painter
     {
         Mesh _targetMesh;
-        bool _skinned;
+        Mesh _skinnedMesh;
         List<Vector2> _UVs;
         Vector3[] _vertices;            //all non optimized vertices of the actual mesh
         Vector3[] _verticesBackup = null;
@@ -35,6 +35,7 @@ namespace DAPolyPaint
         int _channel = 0;
         Texture2D _textureData;
         MeshCopy _meshCopy;
+        private MeshCopy _skinnedMeshCopy;
 
         public ToolAction ToolAction { get; set; }
         public Mesh Target { get { return _targetMesh; } }
@@ -57,13 +58,14 @@ namespace DAPolyPaint
         /// Set the mesh to be painted and rebuild the internal data structures.
         /// </summary>        
         //THIS NEED to be called first before any other painting function. TODO: maybe put in the constructor?
-        public void SetMeshAndRebuild(Mesh target, bool skinned, Texture2D texture)
+        public void SetMeshAndRebuild(Mesh target, Mesh skinnedMesh, Texture2D texture)
         {
             _targetMesh = target;
-            _skinned = skinned;
+            _skinnedMesh = skinnedMesh;
             _textureData = texture;
-            RebuildMeshForPainting();
-            
+            _skinnedMeshCopy = null;
+            _verticesBackup = null;
+            RebuildMeshForPainting();            
         }
 
         /// <summary>
@@ -75,13 +77,18 @@ namespace DAPolyPaint
             var t = Environment.TickCount;            
             var m = _targetMesh;
 
-            _meshCopy = new MeshCopy(m);
+            _meshCopy = new MeshCopy(m); 
+            if (_skinnedMesh != null)  _skinnedMeshCopy = new MeshCopy(_skinnedMesh);
+
 
             var newVertices = new List<Vector3>();
             var newUVs = new List<Vector2>();
             var newTris = new List<int>();
             var newNormals = new List<Vector3>();
             var newBW = new BoneWeight[_meshCopy.tris.Length];
+
+            var newVerticesSkinned = new List<Vector3>();
+            var newNormalsSkinned = new List<Vector3>();
 
             //no more shared vertices, each triangle will have its own 3 vertices.
             for (int i = 0; i < _meshCopy.tris.Length; i++)
@@ -93,9 +100,11 @@ namespace DAPolyPaint
                 //also UVs but the 3 values will be the same
                 newUVs.Add(_meshCopy.UVs[_meshCopy.tris[i - i % 3]]);
 
-                if (_skinned)
+                if (_skinnedMesh)
                 {
-                    newBW[i] = _meshCopy.boneWeights[idx];
+                    newVerticesSkinned.Add(_skinnedMeshCopy.vertices[idx]);
+                    newNormalsSkinned.Add(_skinnedMeshCopy.normals[idx]);
+                    newBW[i] = _skinnedMeshCopy.boneWeights[idx];
                 }
             }
 
@@ -135,13 +144,28 @@ namespace DAPolyPaint
             m.SetTriangles(newTris, 0);
             m.SetNormals(newNormals);
 
-            if (_skinned)
+            if (_skinnedMesh)
             {
+                _skinnedMesh.Clear();
+                if (newVertices.Count > 60000) _skinnedMesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
+                if (_skinnedMesh.subMeshCount > 1) _skinnedMesh.subMeshCount = 1;
+                _skinnedMesh.SetVertices(newVerticesSkinned);
+                _skinnedMesh.SetUVs(_channel, newUVs); //same as non-skinned
+                _skinnedMesh.SetTriangles(newTris, 0);
+                _skinnedMesh.SetNormals(newNormalsSkinned);
                 //TODO(maybe later): Use the more complex new SetBoneWeights to support more than 4 bones per vertex
-                m.boneWeights = newBW;
+                _skinnedMesh.boneWeights = newBW;
             }
 
 
+        }
+
+        public void UpdateSkinnedUVS()
+        {
+            if (_skinnedMesh != null)
+            {
+                _skinnedMesh.SetUVs(_channel, _UVs);
+            }
         }
 
         //After calling RestoreOldMesh, all other painting functions will fail, unless you call RebuildMeshForPainting again.
@@ -861,9 +885,11 @@ namespace DAPolyPaint
 
         public void RestoreVertices()
         {
-            
-            Array.Copy(_verticesBackup, _vertices, Vertices.Length);
-            _targetMesh.SetVertices(_vertices);
+            if (_verticesBackup != null)
+            {
+                Array.Copy(_verticesBackup, _vertices, Vertices.Length);
+                _targetMesh.SetVertices(_vertices);
+            }
         }
     }
 
