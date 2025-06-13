@@ -540,27 +540,31 @@ namespace DAPolyPaint
             _ui.AutoSave = EGL.ToggleLeft("Auto-save at the end of the session", _ui.AutoSave);
 
             EGL.BeginHorizontal();
-                         
-                if (GUL.Button(Temp.Content("Save", "Save the modified painted mesh")))
+
+            if (GUL.Button(Temp.Content("Save", "Save the modified painted mesh")))
+            {
+                _painter.RestoreVertices();
+                if (SaveMeshAsset(false, false))
                 {
-                    if (SaveMeshAsset(false, false))
-                    {
-                        _painter.Undo_Reset();
-                    };
+                    _painter.Undo_Reset();
                 }
-            if (GUL.Button(Temp.Content( "Save As...", "Save the modified painted mesh")))
+                ;
+            }
+            if (GUL.Button(Temp.Content("Save As...", "Save the modified painted mesh")))
+            {
+                _painter.RestoreVertices();
+                if (SaveMeshAsset(false, true))
                 {
-                    if (SaveMeshAsset(false, true))
-                    {
-                        _painter.Undo_Reset();
-                    };
+                    _painter.Undo_Reset();
                 }
-                if (GUL.Button(Temp.Content("Discard!", "Restore to the start of current session")))
-                {
-                    _painter.RestoreOldMesh();
-                    SetPaintingMode(false);
-                }
-           
+                ;
+            }
+            if (GUL.Button(Temp.Content("Discard!", "Restore to the start of current session")))
+            {
+                _painter.RestoreOldMesh();
+                SetPaintingMode(false);
+            }
+
             EGL.EndHorizontal();
         }
         

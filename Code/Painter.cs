@@ -19,7 +19,7 @@ namespace DAPolyPaint
         bool _skinned;
         List<Vector2> _UVs;
         Vector3[] _vertices;            //all non optimized vertices of the actual mesh
-        Vector3[] _verticesBackup;
+        Vector3[] _verticesBackup = null;
         Vector3[] _indexedVerts;
         List<int>[] _facesUsingVert;
         int[] _triangles;               // the raw mesh triangles (one‐to‐one per duplicated vertex) points to _vertices
@@ -34,7 +34,7 @@ namespace DAPolyPaint
         int _undoSequenceCount;
         int _channel = 0;
         Texture2D _textureData;
-        MeshCopy _oldMesh;
+        MeshCopy _meshCopy;
 
         public ToolAction ToolAction { get; set; }
         public Mesh Target { get { return _targetMesh; } }
@@ -45,6 +45,7 @@ namespace DAPolyPaint
         public HashSet<int> SelectedFaces { get { return _selectedFaces; } }
         public bool RestrictToSelected { get; set; } = true;
         public Vector3[] Vertices { get { return _vertices; }}
+
 
         public Painter()
         {
@@ -74,34 +75,34 @@ namespace DAPolyPaint
             var t = Environment.TickCount;            
             var m = _targetMesh;
 
-            _oldMesh = new MeshCopy(m);
+            _meshCopy = new MeshCopy(m);
 
             var newVertices = new List<Vector3>();
             var newUVs = new List<Vector2>();
             var newTris = new List<int>();
             var newNormals = new List<Vector3>();
-            var newBW = new BoneWeight[_oldMesh.tris.Length];
+            var newBW = new BoneWeight[_meshCopy.tris.Length];
 
             //no more shared vertices, each triangle will have its own 3 vertices.
-            for (int i = 0; i < _oldMesh.tris.Length; i++)
+            for (int i = 0; i < _meshCopy.tris.Length; i++)
             {
-                var idx = _oldMesh.tris[i];
+                var idx = _meshCopy.tris[i];
                 newTris.Add(i);
-                newVertices.Add(_oldMesh.vertices[idx]);
-                newNormals.Add(_oldMesh.normals[idx]);
+                newVertices.Add(_meshCopy.vertices[idx]);
+                newNormals.Add(_meshCopy.normals[idx]);
                 //also UVs but the 3 values will be the same
-                newUVs.Add(_oldMesh.UVs[_oldMesh.tris[i - i % 3]]);
+                newUVs.Add(_meshCopy.UVs[_meshCopy.tris[i - i % 3]]);
 
                 if (_skinned)
                 {
-                    newBW[i] = _oldMesh.boneWeights[idx];
+                    newBW[i] = _meshCopy.boneWeights[idx];
                 }
             }
 
 
             _UVs = newUVs; //keep ref for painting
             _vertices = newVertices.ToArray();
-            _verticesBackup = newVertices.ToArray();
+            //_verticesBackup = newVertices.ToArray();
             _triangles = newTris.ToArray();
 
 
@@ -147,7 +148,7 @@ namespace DAPolyPaint
         public void RestoreOldMesh()
         {
             Debug.Log("Restoring mesh...");
-            _oldMesh.PasteTo(_targetMesh);
+            _meshCopy.PasteTo(_targetMesh);
         }
 
 
@@ -460,6 +461,11 @@ namespace DAPolyPaint
 
         public void MoveFaces(HashSet<int> faces, Vector3 vec)
         {
+            if (_verticesBackup == null)
+            {
+                _verticesBackup = new Vector3[_vertices.Length];
+                Array.Copy(_vertices, _verticesBackup, _vertices.Length);
+            }
             foreach (var face in faces)
             {
                 _vertices[_triangles[face * 3]] += vec;
@@ -855,6 +861,7 @@ namespace DAPolyPaint
 
         public void RestoreVertices()
         {
+            
             Array.Copy(_verticesBackup, _vertices, Vertices.Length);
             _targetMesh.SetVertices(_vertices);
         }
