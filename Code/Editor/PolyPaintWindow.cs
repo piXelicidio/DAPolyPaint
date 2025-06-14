@@ -595,14 +595,16 @@ namespace DAPolyPaint
         /// </summary>
         public bool SaveMeshAsset(bool optimizeMesh = false, bool forceNewFileName = false)
         {
-            RestoreSkinned();
-            var currentMeshFile = AssetDatabase.GetAssetPath(_target.Mesh);
+            _painter.UpdateSkinnedUVS();
+
+            // Use the correct mesh reference for saving
+            Mesh meshToSave = (_target.Skinned && _target.SkinnedMesh != null) ? _target.SkinnedMesh : _target.Mesh;
+
+            var currentMeshFile = AssetDatabase.GetAssetPath(meshToSave);
             Debug.Log(currentMeshFile);
             var projectPath = Path.GetDirectoryName(Application.dataPath);
             Debug.Log(projectPath);
 
-            //Debug.Log(currentMeshPath);
-            //Debug.Log(assetFolderPath);
             if (string.IsNullOrEmpty(currentMeshFile))
             {
                 Debug.Log("No asset path found for mesh");
@@ -635,7 +637,7 @@ namespace DAPolyPaint
                     {                     
                         if (newFileName == "unity default resources")
                         {
-                            newFileName = ConvertToValidFileName(_target.Mesh.name);
+                            newFileName = ConvertToValidFileName(meshToSave.name);
                         }                        
                     }
                     newFileName += ".asset";
@@ -645,12 +647,12 @@ namespace DAPolyPaint
                     newFileName = EditorUtility.SaveFilePanelInProject("Save As...", newFileName, "asset", "Saving as new mesh data asset", newPath);
                     if (newFileName == "") return false;
                     //newPath = AssetDatabase.GenerateUniqueAssetPath(newPath);
-                    var mesh = Instantiate(_target.Mesh) as Mesh;
+                    var mesh = Instantiate(meshToSave) as Mesh;
                     AssetDatabase.CreateAsset(mesh, newFileName);
                     reassign = true; 
                 } else
                 {
-                    EditorUtility.SetDirty(_target.Mesh);
+                    EditorUtility.SetDirty(meshToSave);
                 }
                 AssetDatabase.SaveAssets();
                 AssetDatabase.Refresh();
@@ -659,9 +661,15 @@ namespace DAPolyPaint
                     _target.Mesh = AssetDatabase.LoadAssetAtPath<Mesh>(newFileName);
                     if (_target.Skinned)
                     {
+                        var mf = _target.Object.GetComponent<MeshFilter>();
+                        if (mf != null) DestroyImmediate(mf);
+                        var mr = _target.Object.GetComponent<MeshRenderer>();
+                        if (mr != null) DestroyImmediate(mr);                      
+                        _target.SkinnedMesh = null;
                         var meshComp = _target.Object.GetComponent<SkinnedMeshRenderer>();
                         Undo.RecordObject(meshComp, "PolyPaint Mesh");
                         meshComp.sharedMesh = _target.Mesh;
+                        meshComp.enabled = true;
                         PrefabUtility.RecordPrefabInstancePropertyModifications(meshComp);
                     }
                     else
@@ -1564,26 +1572,7 @@ namespace DAPolyPaint
             Debug.Log(s);
         }
 
-        /// <summary>
-        /// Converts any Unity Texture object into a readable Texture2D,
-        /// enabling pixel data access for color sampling.
-        /// </summary>
-        Texture2D ToTexture2D(Texture tex)
-        {
-            var texture2D = new Texture2D(tex.width, tex.height, TextureFormat.RGBA32, false);
-            var currentRT = RenderTexture.active;
-            var renderTexture = new RenderTexture(tex.width, tex.height, 32);
-            Graphics.Blit(tex, renderTexture);
-            RenderTexture.active = renderTexture;
-            texture2D.ReadPixels(new Rect(0, 0, renderTexture.width, renderTexture.height), 0, 0);
-            texture2D.Apply();
-            RenderTexture.active = currentRT;
-            return texture2D;
-        }
-
-       
-
-
+   
 
     }
 
