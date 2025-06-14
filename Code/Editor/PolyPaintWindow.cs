@@ -411,6 +411,24 @@ namespace DAPolyPaint
         }
 
         /// <summary>
+        /// Converts any Unity Texture object into a readable Texture2D,
+        /// enabling pixel data access for color sampling.
+        /// </summary>
+        Texture2D ToTexture2D(Texture tex)
+        {
+            var texture2D = new Texture2D(tex.width, tex.height, TextureFormat.RGBA32, false);
+            var currentRT = RenderTexture.active;
+            var renderTexture = new RenderTexture(tex.width, tex.height, 32);
+            Graphics.Blit(tex, renderTexture);
+            RenderTexture.active = renderTexture;
+            texture2D.ReadPixels(new Rect(0, 0, renderTexture.width, renderTexture.height), 0, 0);
+            texture2D.Apply();
+            RenderTexture.active = currentRT;
+            return texture2D;
+        }
+
+
+        /// <summary>
         /// Renders the GUI section for painting tools, and associated tool-specific settings        
         /// </summary>
         private void OnGUI_PaintingTools()
