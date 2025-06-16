@@ -1060,9 +1060,9 @@ namespace DAPolyPaint
                 EditorGUIDrawFrame("PAINT MODE");
                 Handles.EndGUI();
 
-                OnSceneShiftState(ev);
+                OnScene_ShiftState(ev);
 
-                ProcessSceneEvents(scene, id, ev);
+                OnScene_EventProcessing(scene, id, ev);
             }
         }
 
@@ -1078,7 +1078,7 @@ namespace DAPolyPaint
             //Debug.Log("Exiting 3D object...");
         }
 
-        private void ProcessSceneEvents(SceneView scene, int id, Event ev)
+        private void OnScene_EventProcessing(SceneView scene, int id, Event ev)
         {
             switch (ev.type)
             {
@@ -1267,7 +1267,7 @@ namespace DAPolyPaint
             return kc == KeyCode.W || kc == KeyCode.A || kc == KeyCode.S || kc == KeyCode.D || kc == KeyCode.Q || kc == KeyCode.E || kc == KeyCode.F;
         }
 
-        private void OnSceneShiftState(Event ev)
+        private void OnScene_ShiftState(Event ev)
         {
             if (ev.shift || ev.control)
             {
