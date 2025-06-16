@@ -4,6 +4,7 @@ using System.IO;
 using System.Text.RegularExpressions;
 using UnityEditor;
 using UnityEngine;
+using static UnityEditor.Progress;
 using EGL = UnityEditor.EditorGUILayout;
 using EGU = UnityEditor.EditorGUIUtility;
 using GUL = UnityEngine.GUILayout;
@@ -60,7 +61,7 @@ namespace DAPolyPaint
 
         #region --------- User Interface ---------
         const string WindowName = "DAPolyPaint";
-        readonly GUIContent[] _toolNames_row1 = {
+        readonly GUIContent[] _toolNames = {
             new GUIContent("Brush", "Draw face by face"), 
             new GUIContent("Fill", "Fill areas (Shortcut: Ctrl)"), 
             new GUIContent("Loop", "Draw on mesh loops (Shortcut: Ctrl+Shift)"), 
@@ -74,7 +75,7 @@ namespace DAPolyPaint
             "Click a face to get color (Shortcut: Shift)" //pick
         };
         int _currToolCode = 0;        
-        readonly string[] _fillVariantOptions = new string[] { "Flood", "Replace", "Element", "ALL" };
+        readonly string[] _fillVariantOptions = new string[] { "flood", "replace", "element", "all" };
         bool _anyModifiers = false;
         int _savedTool;
         const float _statusColorBarHeight = 3;
@@ -106,39 +107,41 @@ namespace DAPolyPaint
             public bool ShadeSelection;
             public bool RestrictToSelected;
             internal Vector3 MoveOffset;
+            public bool SelectionCommandsFoldout;
 
-            public void Load(string windowNamePrefix)
+            public void Load(string prefix)
             {
                 MoveOffset = new Vector3(1, 0, 0);
-                ObjectInfoFoldout = EditorPrefs.GetBool(windowNamePrefix + "_objectInfoFoldout", true);
-
-                FillVariant = EditorPrefs.GetInt(windowNamePrefix + "_fillVariant", 0);
-                AutoQuads = EditorPrefs.GetBool(windowNamePrefix + "_autoQuads", true);
-                CurrMirrorAxis = EditorPrefs.GetInt(windowNamePrefix + "_mirrorAxis", 0);
-                AxisOffset = EditorPrefs.GetFloat(windowNamePrefix + "_axisOffset", 0);
-                LoopTwoWays = EditorPrefs.GetBool(windowNamePrefix + "_loopTwoWays", true);
-                AutoSave = EditorPrefs.GetBool(windowNamePrefix + "_autoSave", false); 
-                AutoSwitchMaterial = EditorPrefs.GetBool(windowNamePrefix + "_autoSwitchMaterial", true);
-                AutoShadedWireframe = EditorPrefs.GetBool(windowNamePrefix + "_autoShadedWireframe", true);
-                ToolsFoldedOut = EditorPrefs.GetBool(windowNamePrefix + "_toolsFoldedOut", true);
-                ShadeSelection = EditorPrefs.GetBool(windowNamePrefix + "_shadeSelection", false);
-                RestrictToSelected = EditorPrefs.GetBool(windowNamePrefix + "_restrictToSelected", true);
+                ObjectInfoFoldout = EditorPrefs.GetBool(prefix + "_objectInfoFoldout", true);
+                FillVariant = EditorPrefs.GetInt(prefix + "_fillVariant", 0);
+                AutoQuads = EditorPrefs.GetBool(prefix + "_autoQuads", true);
+                CurrMirrorAxis = EditorPrefs.GetInt(prefix + "_mirrorAxis", 0);
+                AxisOffset = EditorPrefs.GetFloat(prefix + "_axisOffset", 0);
+                LoopTwoWays = EditorPrefs.GetBool(prefix + "_loopTwoWays", true);
+                AutoSave = EditorPrefs.GetBool(prefix + "_autoSave", false); 
+                AutoSwitchMaterial = EditorPrefs.GetBool(prefix + "_autoSwitchMaterial", true);
+                AutoShadedWireframe = EditorPrefs.GetBool(prefix + "_autoShadedWireframe", true);
+                ToolsFoldedOut = EditorPrefs.GetBool(prefix + "_toolsFoldedOut", true);
+                ShadeSelection = EditorPrefs.GetBool(prefix + "_shadeSelection", false);
+                RestrictToSelected = EditorPrefs.GetBool(prefix + "_restrictToSelected", true);
+                SelectionCommandsFoldout = EditorPrefs.GetBool(prefix + "_selectionCommandsFoldout", true);
             }
 
-            public void Save(string windowNamePrefix)
+            public void Save(string prefix)
             {
-                EditorPrefs.SetBool(windowNamePrefix + "_objectInfoFoldout", ObjectInfoFoldout);
-                EditorPrefs.SetInt(windowNamePrefix + "_fillVariant", FillVariant);
-                EditorPrefs.SetBool(windowNamePrefix + "_autoQuads", AutoQuads);
-                EditorPrefs.SetInt(windowNamePrefix + "_mirrorAxis", CurrMirrorAxis);
-                EditorPrefs.SetFloat(windowNamePrefix + "_axisOffset", AxisOffset);
-                EditorPrefs.SetBool(windowNamePrefix + "_loopTwoWays", LoopTwoWays);
-                EditorPrefs.SetBool(windowNamePrefix + "_autoSave", AutoSave);
-                EditorPrefs.SetBool(windowNamePrefix + "_autoSwitchMaterial", AutoSwitchMaterial);
-                EditorPrefs.SetBool(windowNamePrefix + "_autoShadedWireframe", AutoShadedWireframe);
-                EditorPrefs.SetBool(windowNamePrefix + "_toolsFoldedOut", ToolsFoldedOut);
-                EditorPrefs.SetBool(windowNamePrefix + "_shadeSelection", ShadeSelection);
-                EditorPrefs.SetBool(windowNamePrefix + "_shadeSelection", RestrictToSelected);
+                EditorPrefs.SetBool(prefix + "_objectInfoFoldout", ObjectInfoFoldout);
+                EditorPrefs.SetInt(prefix + "_fillVariant", FillVariant);
+                EditorPrefs.SetBool(prefix + "_autoQuads", AutoQuads);
+                EditorPrefs.SetInt(prefix + "_mirrorAxis", CurrMirrorAxis);
+                EditorPrefs.SetFloat(prefix + "_axisOffset", AxisOffset);
+                EditorPrefs.SetBool(prefix + "_loopTwoWays", LoopTwoWays);
+                EditorPrefs.SetBool(prefix + "_autoSave", AutoSave);
+                EditorPrefs.SetBool(prefix + "_autoSwitchMaterial", AutoSwitchMaterial);
+                EditorPrefs.SetBool(prefix + "_autoShadedWireframe", AutoShadedWireframe);
+                EditorPrefs.SetBool(prefix + "_toolsFoldedOut", ToolsFoldedOut);
+                EditorPrefs.SetBool(prefix + "_shadeSelection", ShadeSelection);
+                EditorPrefs.SetBool(prefix + "_restrictToSelected", RestrictToSelected);
+                EditorPrefs.SetBool(prefix + "_selectionCommandsFoldout", SelectionCommandsFoldout);
             }
         }
 
@@ -169,6 +172,8 @@ namespace DAPolyPaint
             _lastUVpick.x = EditorPrefs.GetFloat(WindowName + "_lastUVpick.x", 0.5f);
             _lastUVpick.y = EditorPrefs.GetFloat(WindowName + "_lastUVpick.y", 0.5f);
             //_loopTwoWays = EditorPrefs.GetBool(WindowName + "_loopTwoWays", true);
+
+ 
         }
 
         private void OnDisable()
@@ -333,7 +338,16 @@ namespace DAPolyPaint
             }
 
             OnGUI_Settings();
+            OnGUI_Help();
             EGL.EndScrollView();
+        }
+
+        private void OnGUI_Help()
+        {
+            if (GUL.Button("Help..."))
+            {
+                Application.OpenURL("https://github.com/piXelicidio/DAPolyPaint/blob/main/README.md");
+            }
         }
 
         private void OnGUI_Settings()
@@ -429,6 +443,17 @@ namespace DAPolyPaint
             return texture2D;
         }
 
+        Texture2D MakeTex(int w, int h, Color col)
+        {
+            var pix = new Color[w * h];
+            for (int i = 0; i < pix.Length; i++) pix[i] = col;
+            var tex = new Texture2D(w, h);
+            tex.hideFlags = HideFlags.HideAndDontSave;
+            tex.SetPixels(pix);
+            tex.Apply();
+            return tex;
+        }
+
 
         /// <summary>
         /// Renders the GUI section for painting tools, and associated tool-specific settings        
@@ -445,7 +470,7 @@ namespace DAPolyPaint
 
                 //TODO: toolbar selected parameter can be set to -1 to unselect all buttons.
                 //TOOLBAR of: Brush, Fill, Loop, Pick
-                SetCurrTool(GUL.Toolbar(_currToolCode, _toolNames_row1));
+                SetCurrTool(GUL.Toolbar(_currToolCode, _toolNames));
                     
                 if (_currToolCode >= 0 && _currToolCode <= ToolType.ToolNames.Length)
                 {
@@ -483,49 +508,60 @@ namespace DAPolyPaint
                     if (PaintCursorDrawer.ShowMirrorPlane) SceneView.lastActiveSceneView.Repaint();
                 }               
 
-                OnGUI_ToolAction();
+                
             }
             EGL.EndFoldoutHeaderGroup();
             GUL.EndVertical();
+
+            OnGUI_ToolAction();
         }
 
+        
         private void OnGUI_ToolAction()
         {
             EGL.LabelField("Tool Action:", EditorStyles.miniLabel);
-            _ui.ToolAction = GUL.Toolbar(_ui.ToolAction, new string[] { "Paint", "Select" });
+            _ui.ToolAction = GUL.Toolbar(_ui.ToolAction, new string[] { "paint", "select" });
             _painter.ToolAction = (ToolAction)_ui.ToolAction;
             PaintCursorDrawer.CurrToolAction = (ToolAction)_ui.ToolAction;
         }
 
         private void OnGUI_SelectionCommands()
         {
+
             EGL.Space();
-            EGL.LabelField("Selection actions:", EditorStyles.miniLabel);
-            if (GUL.Button("Clear selection"))
+            GUL.BeginVertical(EditorStyles.textArea);
+            _ui.SelectionCommandsFoldout = EGL.BeginFoldoutHeaderGroup(_ui.SelectionCommandsFoldout, "Selection commands");
+            //EGL.LabelField("Selection actions:", EditorStyles.miniLabel);
+            if (_ui.SelectionCommandsFoldout)
             {
-                _painter.SelectedFaces.Clear();
-                RebuildSelection();
-                SceneView.lastActiveSceneView.Repaint();
+                if (GUL.Button("Clear selection"))
+                {
+                    _painter.SelectedFaces.Clear();
+                    RebuildSelection();
+                    SceneView.lastActiveSceneView.Repaint();
+                }
+                _ui.ShadeSelection = EGL.ToggleLeft("Shade selected", _ui.ShadeSelection);
+                PaintCursorDrawer.ShadeSelected = _ui.ShadeSelection;
+                _ui.RestrictToSelected = EGL.ToggleLeft("Restrict painting to selected", _ui.RestrictToSelected);
+                _painter.RestrictToSelected = _ui.RestrictToSelected;
+                if (GUL.Button("Move Faces Away"))
+                {
+                    _painter.MoveFaces(_painter.SelectedFaces, _ui.MoveOffset);
+                    _dummyCollider.sharedMesh = _painter.Target;
+                    RebuildSelection();
+                    SceneView.lastActiveSceneView.Repaint();
+                }
+                //_ui.MoveOffset = EGL.Vector3Field("Offset", _ui.MoveOffset);
+                if (GUL.Button("Move All Back"))
+                {
+                    _painter.RestoreVertices();
+                    _dummyCollider.sharedMesh = _painter.Target;
+                    RebuildSelection();
+                    SceneView.lastActiveSceneView.Repaint();
+                }
             }
-            _ui.ShadeSelection = EGL.ToggleLeft("Shade selected", _ui.ShadeSelection);
-            PaintCursorDrawer.ShadeSelected = _ui.ShadeSelection;
-            _ui.RestrictToSelected = EGL.ToggleLeft("Restrict painting to selected", _ui.RestrictToSelected);
-            _painter.RestrictToSelected = _ui.RestrictToSelected;
-            if (GUL.Button("Move Away"))
-            {
-                _painter.MoveFaces(_painter.SelectedFaces, _ui.MoveOffset);
-                _dummyCollider.sharedMesh = _painter.Target;
-                RebuildSelection();
-                SceneView.lastActiveSceneView.Repaint();
-            }
-            //_ui.MoveOffset = EGL.Vector3Field("Offset", _ui.MoveOffset);
-            if (GUL.Button("Restore mesh"))
-            {
-                _painter.RestoreVertices();
-                _dummyCollider.sharedMesh = _painter.Target;
-                RebuildSelection();
-                SceneView.lastActiveSceneView.Repaint();
-            }
+            EGL.EndFoldoutHeaderGroup();
+            GUL.EndVertical();
         }
 
         private void OnGUI_InputEvents()

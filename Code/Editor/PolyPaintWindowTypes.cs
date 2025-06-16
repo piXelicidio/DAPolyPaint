@@ -264,7 +264,7 @@ namespace DAPolyPaint
         public const int fill = 1;
         public const int loop = 2;
         public const int pick = 3;
-        public static string[] ToolNames = new string[] { "Brush", "Fill", "Loop", "Pick" };
+        public static string[] ToolNames = new string[] { "brush", "fill", "loop", "pick" };
     }
 
     public static class FillVariant
