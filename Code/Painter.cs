@@ -38,6 +38,7 @@ namespace DAPolyPaint
         private MeshCopy _skinnedMeshCopy;
 
         public ToolAction ToolAction { get; set; }
+        public bool IsSelectSub {get; set;}
         public Mesh Target { get { return _targetMesh; } }
         public int NumUVCalls { get; private set; }
         public int NumFaces { get { return _triangles.Length / 3; } }
@@ -52,6 +53,7 @@ namespace DAPolyPaint
         {
             QuadTolerance = 120;
             _undoLevels = new List<List<Vector2>>();
+            IsSelectSub = false;
         }
 
         /// <summary>
@@ -468,10 +470,10 @@ namespace DAPolyPaint
                         }
                     }
                     break;
-                case ToolAction.Select:
+                case ToolAction.Select when !IsSelectSub:
                     _selectedFaces.Add(face);
                     break;
-                case ToolAction.SelectSub:
+                case ToolAction.Select when IsSelectSub:
                     _selectedFaces.Remove(face);
                     break;
             }
@@ -969,6 +971,6 @@ namespace DAPolyPaint
         }
     }
 
-    public enum ToolAction { Paint = 0, Select = 1, SelectSub = 2 }
+    public enum ToolAction { Paint = 0, Select = 1 }
 
 }

@@ -82,6 +82,8 @@ namespace DAPolyPaint
         public readonly Color ColorStatusPainting = new Color(1, 0.4f, 0);//orange
         public readonly Color ColorStatusError = Color.red;
         private UIState _ui;
+        private bool _isShiftDown;
+        private bool _isCtrlDown;
 
         private struct UIState
         {
@@ -490,7 +492,7 @@ namespace DAPolyPaint
         private void OnGUI_ToolAction()
         {
             EGL.LabelField("Tool Action:", EditorStyles.miniLabel);
-            _ui.ToolAction = GUL.Toolbar(_ui.ToolAction, new string[] { "Paint", "Select Add", "Select Sub" });
+            _ui.ToolAction = GUL.Toolbar(_ui.ToolAction, new string[] { "Paint", "Select" });
             _painter.ToolAction = (ToolAction)_ui.ToolAction;
             PaintCursorDrawer.CurrToolAction = (ToolAction)_ui.ToolAction;
         }
@@ -894,13 +896,15 @@ namespace DAPolyPaint
 
         void AcquireInput(Event e, int id)
         {
+            //if (GUIUtility.hotControl == 0)
             GUIUtility.hotControl = id;
             e.Use();
             EGU.SetWantsMouseJumping(1);
         }
 
-        void ReleaseInput(Event e)
+        void ReleaseInput(Event e, int id)
         {
+            //if (GUIUtility.hotControl == id)
             GUIUtility.hotControl = 0;
             e.Use();
             EGU.SetWantsMouseJumping(0);
@@ -1095,7 +1099,7 @@ namespace DAPolyPaint
                     break;
 
                 case EventType.MouseUp when ev.button == 0:
-                    HandleMouseUp(ev);
+                    HandleMouseUp(ev, id);
                     break;
 
                 case EventType.KeyDown:
@@ -1126,7 +1130,7 @@ namespace DAPolyPaint
             scene.Repaint();
         }
 
-        private void HandleMouseUp(Event ev)
+        private void HandleMouseUp(Event ev, int id)
         {
             // both loop and brush need to save
             if (_currToolCode == ToolType.loop || _currToolCode == ToolType.brush)
@@ -1142,7 +1146,7 @@ namespace DAPolyPaint
                 }
             }
 
-            ReleaseInput(ev);
+            ReleaseInput(ev, id);
             _isMousePressed = false;
         }
 
@@ -1166,6 +1170,10 @@ namespace DAPolyPaint
             _isMousePressed = true;
             if (_target.Mesh != null)
             {
+                if (_ui.ToolAction == (int)ToolAction.Select && !_isShiftDown && !_isCtrlDown)
+                {
+                    _painter.SelectedFaces.Clear();
+                }
                 DoFaceHit(scene, ev.mousePosition);
                 BuildCursor();
                 if (tool == ToolType.fill)
@@ -1269,6 +1277,18 @@ namespace DAPolyPaint
 
         private void OnScene_ShiftState(Event ev)
         {
+
+            if (_isShiftDown != ev.shift)
+            {
+                _isShiftDown = ev.shift;
+                _painter.IsSelectSub = _isShiftDown;
+            }
+            _isCtrlDown = ev.control;
+            if (_ui.ToolAction == (int)ToolAction.Select)
+            {
+                return;
+            }
+
             if (ev.shift || ev.control)
             {
                 if (!_anyModifiers)

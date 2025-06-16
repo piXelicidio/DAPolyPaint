@@ -153,7 +153,7 @@ namespace DAPolyPaint
                     {
                         var actionStr = "";
                         if (CurrToolAction != ToolAction.Paint && CurrToolCode != ToolType.pick) {
-                            actionStr = CurrToolAction == ToolAction.Select ? " Sel.Add" : " Sel.Sub";
+                            actionStr = " Select";
                         }
                         Handles.Label(v2, ToolType.ToolNames[CurrToolCode] + actionStr);
                     }
