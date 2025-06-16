@@ -43,6 +43,8 @@ namespace DAPolyPaint
         public static Color TryPickColor { get; set; }
         public static int CurrToolCode { get; set; } = 0;
         public static ToolAction CurrToolAction { get; set; }
+        public static bool IsShiftDown {get; set; }
+        public static bool IsCtrlDown {get; set; }
         public static bool PaintMode { get; set; }
         public static bool MirrorMode { get; set; }
         public static int MirrorAxis { get; set; }
@@ -154,6 +156,9 @@ namespace DAPolyPaint
                         var actionStr = "";
                         if (CurrToolAction != ToolAction.Paint && CurrToolCode != ToolType.pick) {
                             actionStr = " Select";
+                            if (IsShiftDown) actionStr += " (-)"; 
+                                else if (IsCtrlDown) actionStr += " (+)";
+                            
                         }
                         Handles.Label(v2, ToolType.ToolNames[CurrToolCode] + actionStr);
                     }

@@ -1282,8 +1282,10 @@ namespace DAPolyPaint
             {
                 _isShiftDown = ev.shift;
                 _painter.IsSelectSub = _isShiftDown;
+                PaintCursorDrawer.IsShiftDown = _isShiftDown;
             }
             _isCtrlDown = ev.control;
+            PaintCursorDrawer.IsCtrlDown = _isCtrlDown;
             if (_ui.ToolAction == (int)ToolAction.Select)
             {
                 return;
