@@ -82,6 +82,17 @@ namespace DAPolyPaint
             _meshCopy = new MeshCopy(m); 
             if (_skinnedMesh != null)  _skinnedMeshCopy = new MeshCopy(_skinnedMesh);
 
+            // If UVs are missing or the wrong size, create default UVs
+            if (_meshCopy.UVs == null || _meshCopy.UVs.Length != _meshCopy.vertices.Length)
+            {
+                _meshCopy.UVs = new Vector2[_meshCopy.vertices.Length];
+                for (int i = 0; i < _meshCopy.UVs.Length; i++)
+                {
+                    // Simple planar mapping as a fallback (can be improved)
+                    _meshCopy.UVs[i] = new Vector2(_meshCopy.vertices[i].x, _meshCopy.vertices[i].z);
+                }
+            }
+
 
             var newVertices = new List<Vector3>();
             var newUVs = new List<Vector2>();
