@@ -118,6 +118,37 @@ namespace DAPolyPaint
             }
         }
 
+        public static void ImportToMesh(string filePath, Mesh mesh)
+        {
+            if (mesh == null) throw new ArgumentNullException(nameof(mesh));
+
+            // 1) read raw OBJ lists
+            List<Vector3> inVerts;
+            List<Vector2> inUVs;
+            List<ObjFace> inFaces;
+            Import(filePath, out inVerts, out inUVs, out inFaces);
+
+            // 2) build per-corner buffers
+            var verts = new List<Vector3>(inFaces.Count);
+            var uvs = new List<Vector2>(inFaces.Count);
+            var tris = new List<int>(inFaces.Count);
+            for (int i = 0; i < inFaces.Count; i++)
+            {
+                var f = inFaces[i];
+                verts.Add(inVerts[f.vIndex]);
+                uvs.Add(inUVs[f.tIndex]);
+                tris.Add(i);
+            }
+
+            // 3) assign into the existing Mesh
+            mesh.Clear();
+            mesh.SetVertices(verts);
+            mesh.SetUVs(0, uvs);
+            mesh.SetTriangles(tris, 0);
+            mesh.RecalculateBounds();
+            mesh.RecalculateNormals();
+        }
+
         public struct ObjFace
         {
             public int vIndex, tIndex, nIndex;

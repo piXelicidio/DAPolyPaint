@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using static UnityEngine.GraphicsBuffer;
 
@@ -67,6 +68,12 @@ namespace DAPolyPaint
             );
         }
 
+        public void Import()
+        {
+            ObjFormat.ImportToMesh(@"c:\temp\result.obj", _targetMesh);
+            SetMeshAndRebuild(_targetMesh, null, _textureData);
+        }
+
         /// <summary>
         /// Set the mesh to be painted and rebuild the internal data structures.
         /// </summary>        
@@ -87,20 +94,19 @@ namespace DAPolyPaint
         /// </summary>
         void RebuildMeshForPainting()
         {
-            var t = Environment.TickCount;            
-            var m = _targetMesh;
+            var t = Environment.TickCount;                        
 
-            _meshCopy = new MeshCopy(m); 
+            _meshCopy = new MeshCopy(_targetMesh); 
             if (_skinnedMesh != null)  _skinnedMeshCopy = new MeshCopy(_skinnedMesh);
 
             // If UVs are missing or the wrong size, create default UVs
-            if (_meshCopy.UVs == null || _meshCopy.UVs.Length != _meshCopy.vertices.Length)
+            if (_meshCopy.UVs == null || _meshCopy.UVs.Count != _meshCopy.vertices.Count)
             {
-                _meshCopy.UVs = new Vector2[_meshCopy.vertices.Length];
-                for (int i = 0; i < _meshCopy.UVs.Length; i++)
+                _meshCopy.UVs = new List<Vector2>(_meshCopy.vertices.Count);
+                for (int i = 0; i < _meshCopy.UVs.Count; i++)
                 {
                     // Simple planar mapping as a fallback (can be improved)
-                    _meshCopy.UVs[i] = new Vector2(_meshCopy.vertices[i].x, _meshCopy.vertices[i].z);
+                    _meshCopy.UVs.Add(new Vector2(_meshCopy.vertices[i].x, _meshCopy.vertices[i].z));
                 }
             }
 
@@ -109,13 +115,14 @@ namespace DAPolyPaint
             var newUVs = new List<Vector2>();
             var newTris = new List<int>();
             var newNormals = new List<Vector3>();
-            var newBW = new BoneWeight[_meshCopy.tris.Length];
+            var newBW = new BoneWeight[0];
+            if (_skinnedMesh) newBW = new BoneWeight[_meshCopy.tris.Count];
 
             var newVerticesSkinned = new List<Vector3>();
             var newNormalsSkinned = new List<Vector3>();
 
             //no more shared vertices, each triangle will have its own 3 vertices.
-            for (int i = 0; i < _meshCopy.tris.Length; i++)
+            for (int i = 0; i < _meshCopy.tris.Count; i++)
             {
                 var idx = _meshCopy.tris[i];
                 newTris.Add(i);
@@ -160,13 +167,13 @@ namespace DAPolyPaint
             Debug.Log(s);
 
             //updating mesh with new distribution of vertices
-            m.Clear();
-            if (newVertices.Count > 60000) m.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
-            if (m.subMeshCount > 1) m.subMeshCount = 1; //NOT support for multiple submeshes.
-            m.SetVertices(newVertices);
-            m.SetUVs(_channel, newUVs);
-            m.SetTriangles(newTris, 0);
-            m.SetNormals(newNormals);
+            _targetMesh.Clear();
+            if (newVertices.Count > 60000) _targetMesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
+            if (_targetMesh.subMeshCount > 1) _targetMesh.subMeshCount = 1; //NOT support for multiple submeshes.
+            _targetMesh.SetVertices(newVertices);
+            _targetMesh.SetUVs(_channel, newUVs);
+            _targetMesh.SetTriangles(newTris, 0);
+            _targetMesh.SetNormals(newNormals);
 
             if (_skinnedMesh)
             {
@@ -924,19 +931,20 @@ namespace DAPolyPaint
     /// </summary>
     public class MeshCopy
     {
-        public int[] tris;
-        public Vector3[] vertices;
-        public Vector2[] UVs; //channel 0 
-        public Vector3[] normals;
-        public BoneWeight[] boneWeights;
-        
+        public List<int> tris = new List<int>();
+        public List<Vector3> vertices = new List<Vector3>();
+        public List<Vector2> UVs = new List<Vector2>();  // channel 0
+        public List<Vector3> normals = new List<Vector3>();
+        public List<BoneWeight> boneWeights = new List<BoneWeight>();
+
+
         public MeshCopy(Mesh m)
         {
-            tris = m.triangles;
-            vertices = m.vertices;
-            UVs = m.uv;
-            normals = m.normals;
-            boneWeights = m.boneWeights;            
+            tris = m.triangles.ToList();
+            vertices = m.vertices.ToList();
+            UVs = m.uv.ToList();
+            normals = m.normals.ToList();
+            boneWeights = m.boneWeights.ToList();            
         }
 
         public void PasteTo(Mesh m)
@@ -944,12 +952,12 @@ namespace DAPolyPaint
             if (m != null)
             {
                 m.Clear();
-                if (vertices.Length > 60000) m.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
-                m.SetVertices(new List<Vector3>(vertices)); //  order is important.
-                m.SetUVs(0, new List<Vector2>(UVs));
-                m.SetTriangles(new List<int>(tris), 0);
-                m.SetNormals(new List<Vector3>(normals));
-                m.boneWeights = boneWeights;
+                if (vertices.Count > 60000) m.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
+                m.SetVertices(vertices); //  order is important.
+                m.SetUVs(0, UVs);
+                m.SetTriangles(tris, 0);
+                m.SetNormals(normals);
+                m.boneWeights = boneWeights.ToArray();
             }
         }
     }

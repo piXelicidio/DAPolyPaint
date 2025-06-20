@@ -626,12 +626,25 @@ namespace DAPolyPaint
                 _painter.RestoreOldMesh();
                 SetPaintingMode(false);
             }
-
             EGL.EndHorizontal();
 
-            if (GUL.Button("Export OBJ")) {
+            EGL.BeginHorizontal();
+            if (GUL.Button("Export OBJ"))
+            {
                 _painter.Export();
             }
+            if (GUL.Button("Import OBJ"))
+            {
+                _painter.Import();
+                _target.Vertices = _target.Mesh.vertices;
+                _dummyCollider.sharedMesh = _target.Mesh;
+
+                _currFace = -1;
+                _paintCursor.TargetMesh = _target.Mesh;
+                _paintCursor.enabled = true;
+            }
+            EGL.EndHorizontal();
+
         }
         
         public string ConvertToValidFileName(string input, char replacement = '_')
