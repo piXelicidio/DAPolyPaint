@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using static UnityEngine.GraphicsBuffer;
 
- 
+
 namespace DAPolyPaint 
 {
     /// <summary>
@@ -54,6 +54,17 @@ namespace DAPolyPaint
             QuadTolerance = 120;
             _undoLevels = new List<List<Vector2>>();
             IsSelectSub = false;
+        }
+
+        public void Export()
+        {
+            ObjFormat.Export(
+                _indexedVerts,
+                _indexedFaces,
+                _UVs,
+                _triangles,
+                @"c:\temp\result.obj"
+            );
         }
 
         /// <summary>
@@ -896,12 +907,13 @@ namespace DAPolyPaint
             }
         }
 
-        public void RestoreVertices()
+        public void MoveFacesUndoBack()
         {
             if (_verticesBackup != null)
             {
                 Array.Copy(_verticesBackup, _vertices, Vertices.Length);
                 _targetMesh.SetVertices(_vertices);
+                SelectedFaces.Clear(); //TODO: temporal patch, before fixing the selection that is not updated when faces are undo back
             }
         }
     }

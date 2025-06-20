@@ -246,6 +246,7 @@ namespace DAPolyPaint
             }
             else
             {
+                _painter.MoveFacesUndoBack();
                 RestoreSkinned();
                 _paintingMode = false;
                 SceneView.lastActiveSceneView.Repaint();
@@ -554,7 +555,7 @@ namespace DAPolyPaint
                 //_ui.MoveOffset = EGL.Vector3Field("Offset", _ui.MoveOffset);
                 if (GUL.Button("Move All Back"))
                 {
-                    _painter.RestoreVertices();
+                    _painter.MoveFacesUndoBack();
                     _dummyCollider.sharedMesh = _painter.Target;
                     RebuildSelection();
                     SceneView.lastActiveSceneView.Repaint();
@@ -604,7 +605,7 @@ namespace DAPolyPaint
 
             if (GUL.Button(Temp.Content("Save", "Save the modified painted mesh")))
             {
-                _painter.RestoreVertices();
+                _painter.MoveFacesUndoBack();
                 if (SaveMeshAsset(false, false))
                 {
                     _painter.Undo_Reset();
@@ -613,7 +614,7 @@ namespace DAPolyPaint
             }
             if (GUL.Button(Temp.Content("Save As...", "Save the modified painted mesh")))
             {
-                _painter.RestoreVertices();
+                _painter.MoveFacesUndoBack();
                 if (SaveMeshAsset(false, true))
                 {
                     _painter.Undo_Reset();
@@ -627,6 +628,10 @@ namespace DAPolyPaint
             }
 
             EGL.EndHorizontal();
+
+            if (GUL.Button("Export OBJ")) {
+                _painter.Export();
+            }
         }
         
         public string ConvertToValidFileName(string input, char replacement = '_')
