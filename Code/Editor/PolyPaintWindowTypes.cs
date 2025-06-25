@@ -39,7 +39,7 @@ namespace DAPolyPaint
         private static PolyList _selectedFaces = new PolyList();
 
         static PolyList _polyCursor = new PolyList();
-        public static Color CurrPixelColor { get { return _currPixelColor; } set { _currPixelColor = value.linear; } }
+        public static Color CurrPixelColor { get { return _currPixelColor; } set { _currPixelColor = value; } }
         public static Color TryPickColor { get; set; }
         public static int CurrToolCode { get; set; } = 0;
         public static ToolAction CurrToolAction { get; set; }
@@ -142,11 +142,11 @@ namespace DAPolyPaint
                     //Gizmos.DrawLine(ray.origin, v2);
                     if (CurrToolCode != ToolType.pick)
                     {
-                        Handles.color = _currPixelColor;
+                        Handles.color = _currPixelColor.gamma;
                     }
                     else
                     {
-                        Handles.color = TryPickColor;
+                        Handles.color = TryPickColor.gamma;
                     }
                     Handles.DrawDottedLine(ray.origin, v2, 2f);
                     if (CurrToolCode >= 0 && CurrToolCode < ToolType.ToolNames.Length)
@@ -175,7 +175,7 @@ namespace DAPolyPaint
                         var poly = _polyCursor[p];
                         if (poly.Count > 2)
                         {
-                            Handles.color = _currPixelColor;
+                            Handles.color = _currPixelColor.gamma;
                             Vector3 a = poly[0];
                             Vector3 b = poly[1];
                             Vector3 c = poly[2];
@@ -190,7 +190,7 @@ namespace DAPolyPaint
                         var poly = _polyCursor[p];
                         if (poly.Count > 2)
                         {
-                            Handles.color = new Color(1f, 0.4f, 0f).linear;
+                            Handles.color = SelColor;
                             Vector3 a = poly[0];
                             Vector3 b = poly[1];
                             Vector3 c = poly[2];

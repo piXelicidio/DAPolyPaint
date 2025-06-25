@@ -619,9 +619,9 @@ namespace DAPolyPaint
         public Color GetTextureColor(Vector2 uv)
         {
             if (_textureData == null)
-                return Color.white;
+                return Color.white.linear;
             else
-                return _textureData.GetPixel((int)(uv.x * _textureData.width), (int)(uv.y * _textureData.height));
+                return _textureData.GetPixel((int)(uv.x * _textureData.width), (int)(uv.y * _textureData.height)).linear;
         }
 
         /// <summary>
