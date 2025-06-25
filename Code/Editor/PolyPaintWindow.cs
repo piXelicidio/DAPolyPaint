@@ -126,7 +126,7 @@ namespace DAPolyPaint
                 AutoShadedWireframe = EditorPrefs.GetBool(prefix + "_autoShadedWireframe", true);
                 ToolsFoldedOut = EditorPrefs.GetBool(prefix + "_toolsFoldedOut", true);
                 ShadeSelection = EditorPrefs.GetBool(prefix + "_shadeSelection", false);
-                RestrictToSelected = EditorPrefs.GetBool(prefix + "_restrictToSelected", true);
+                RestrictToSelected = EditorPrefs.GetBool(prefix + "_restrictToSelected", false);
                 SelectionCommandsFoldout = EditorPrefs.GetBool(prefix + "_selectionCommandsFoldout", true);
 
                 btnImportOBJ = new GUIContent(
@@ -300,13 +300,17 @@ namespace DAPolyPaint
                 {                   
                     _ui.SavedSceneViewCameraMode = sv.cameraMode;
                     _ui.SavedSceneLighting = sv.sceneLighting;
-                    sv.cameraMode = SceneView.GetBuiltinCameraMode(DrawCameraMode.TexturedWire);
+                    try
+                    {
+                        sv.cameraMode = SceneView.GetBuiltinCameraMode(DrawCameraMode.TexturedWire);
+                    }
+                    catch { }
                     sv.sceneLighting = false;
                     sv.Repaint();
                 }
                 else
                 {
-                    sv.cameraMode = _ui.SavedSceneViewCameraMode;
+                    if (_ui.SavedSceneViewCameraMode != null) sv.cameraMode = _ui.SavedSceneViewCameraMode;
                     sv.sceneLighting = _ui.SavedSceneLighting;
                     sv.Repaint();
                 }
@@ -572,40 +576,44 @@ namespace DAPolyPaint
             //EGL.LabelField("Selection actions:", EditorStyles.miniLabel);
             if (_ui.SelectionCommandsFoldout)
             {
-                if (GUL.Button("Clear selection"))
+                using (new EditorGUI.DisabledScope(_painter.SelectedFaces.Count == 0))
                 {
-                    _painter.SelectedFaces.Clear();
-                    RebuildSelection();
-                    SceneView.lastActiveSceneView.Repaint();
-                }
-                _ui.ShadeSelection = EGL.ToggleLeft("Shade selected", _ui.ShadeSelection);
-                PaintCursorDrawer.ShadeSelected = _ui.ShadeSelection;
-                _ui.RestrictToSelected = EGL.ToggleLeft("Restrict painting to selected", _ui.RestrictToSelected);
-                _painter.RestrictToSelected = _ui.RestrictToSelected;
+                    if (GUL.Button("Clear selection"))
+                    {
+                        _painter.SelectedFaces.Clear();
+                        RebuildSelection();
+                        SceneView.lastActiveSceneView.Repaint();
+                    }
+                    _ui.ShadeSelection = EGL.ToggleLeft("Shade selected", _ui.ShadeSelection);
+                    PaintCursorDrawer.ShadeSelected = _ui.ShadeSelection;
+                    _ui.RestrictToSelected = EGL.ToggleLeft("Restrict painting to selected", _ui.RestrictToSelected);
+                    _painter.RestrictToSelected = _ui.RestrictToSelected;
 
-                GUL.Label("Move Faces Away:");
-                EGL.BeginHorizontal();
-                if (GUL.Button("+X"))
-                {
-                    _painter.MoveFaces(_painter.SelectedFaces, _ui.MoveOffset);
-                    _dummyCollider.sharedMesh = _painter.Target;
-                    RebuildSelection();
-                    SceneView.lastActiveSceneView.Repaint();
-                }
-                if (GUL.Button("-X")) {
-                    _painter.MoveFaces(_painter.SelectedFaces, -_ui.MoveOffset);
-                    _dummyCollider.sharedMesh = _painter.Target;
-                    RebuildSelection();
-                    SceneView.lastActiveSceneView.Repaint();
-                }
-                
-                EGL.EndHorizontal();
-                if (GUL.Button("Move All Back"))
-                {
-                    _painter.MoveFacesUndoBack();
-                    _dummyCollider.sharedMesh = _painter.Target;
-                    RebuildSelection();
-                    SceneView.lastActiveSceneView.Repaint();
+                    GUL.Label("Move Faces Away:");
+                    EGL.BeginHorizontal();
+                    if (GUL.Button("+X"))
+                    {
+                        _painter.MoveFaces(_painter.SelectedFaces, _ui.MoveOffset);
+                        _dummyCollider.sharedMesh = _painter.Target;
+                        RebuildSelection();
+                        SceneView.lastActiveSceneView.Repaint();
+                    }
+                    if (GUL.Button("-X"))
+                    {
+                        _painter.MoveFaces(_painter.SelectedFaces, -_ui.MoveOffset);
+                        _dummyCollider.sharedMesh = _painter.Target;
+                        RebuildSelection();
+                        SceneView.lastActiveSceneView.Repaint();
+                    }
+
+                    EGL.EndHorizontal();
+                    if (GUL.Button("Move All Back"))
+                    {
+                        _painter.MoveFacesUndoBack();
+                        _dummyCollider.sharedMesh = _painter.Target;
+                        RebuildSelection();
+                        SceneView.lastActiveSceneView.Repaint();
+                    }
                 }
             }
             EGL.EndFoldoutHeaderGroup();
