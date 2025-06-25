@@ -67,16 +67,14 @@ namespace DAPolyPaint
         {
             if (!obj.enabled || !PaintMode) return;
 
-            DrawCursor();
-            DrawCursorRays();
-
             //mirror axis..
             if (MirrorMode && ShowMirrorPlane)
             {
                 DrawMirrorPlane(obj);
-            }
-            DrawSelected();        
+            }            
         }
+
+
 
         private static void DrawPolyIfFacing(Vector3[] verts, Color frontColor, Color backColor = default)
         {
@@ -113,7 +111,7 @@ namespace DAPolyPaint
             Handles.DrawAAConvexPolygon(verts);
         }
 
-        private static void DrawSelected()
+        public static void DrawSelected()
         {
             for (int p = 0; p < _selectedFaces.Count; p++)
             {
@@ -133,7 +131,7 @@ namespace DAPolyPaint
             }
         }
 
-        private static void DrawCursorRays()
+        public static void DrawCursorRays()
         {
             foreach (CursorRay ray in CursorRays)
             {
@@ -166,7 +164,7 @@ namespace DAPolyPaint
             }
         }
 
-        private static void DrawCursor()
+        public static void DrawCursor()
         {
             if (_polyCursor.Count > 0 && CurrToolCode != ToolType.pick)
             {

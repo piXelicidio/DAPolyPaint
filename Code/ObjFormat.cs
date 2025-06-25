@@ -70,7 +70,7 @@ namespace DAPolyPaint
             foreach (var raw in File.ReadLines(filePath))
             {
                 if (raw.Length < 2 || raw[0] == '#') continue;
-                var parts = raw.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                var parts = raw.Trim().Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
                 switch (parts[0])
                 {
                     case "v":

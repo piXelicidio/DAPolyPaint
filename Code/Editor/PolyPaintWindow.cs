@@ -164,6 +164,7 @@ namespace DAPolyPaint
 
         private void OnEnable()
         {
+            if (_painter == null) _painter = new Painter();
             SceneView.duringSceneGui += OnSceneGUI;
             AssemblyReloadEvents.beforeAssemblyReload += OnBeforeAssemblyReload;
             AssemblyReloadEvents.afterAssemblyReload += OnAfterAssemblyReload;
@@ -1117,6 +1118,10 @@ namespace DAPolyPaint
                 Handles.BeginGUI();
                 EditorGUIDrawFrame("PAINT MODE");
                 Handles.EndGUI();
+
+                PaintCursorDrawer.DrawCursor();
+                PaintCursorDrawer.DrawCursorRays();
+                PaintCursorDrawer.DrawSelected();
 
                 OnScene_ShiftState(ev);
 
