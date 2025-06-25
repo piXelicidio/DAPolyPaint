@@ -280,6 +280,7 @@ namespace DAPolyPaint
         {
             _content.text = text;
             _content.tooltip = tooltip;
+           // _content.image = null;
             return _content;
         }
     }

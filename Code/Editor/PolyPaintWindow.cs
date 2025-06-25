@@ -73,7 +73,7 @@ namespace DAPolyPaint
             "Click a starting face (Shortcut: Ctrl)", //fill
             "Drag over a quad edge (Shortcut: Ctrl+Shift)", //loop
             "Click a face to get color (Shortcut: Shift)" //pick
-        };
+        };        
         int _currToolCode = 0;        
         readonly string[] _fillVariantOptions = new string[] { "flood", "replace", "element", "all" };
         bool _anyModifiers = false;
@@ -85,6 +85,7 @@ namespace DAPolyPaint
         private UIState _ui;
         private bool _isShiftDown;
         private bool _isCtrlDown;
+        private string _lastExportOBJ = "";
 
         private struct UIState
         {
@@ -109,6 +110,9 @@ namespace DAPolyPaint
             internal Vector3 MoveOffset;
             public bool SelectionCommandsFoldout;
 
+            public GUIContent btnImportOBJ;
+            public GUIContent btnExportOBJ; 
+
             public void Load(string prefix)
             {
                 MoveOffset = new Vector3(1, 0, 0);
@@ -125,6 +129,12 @@ namespace DAPolyPaint
                 ShadeSelection = EditorPrefs.GetBool(prefix + "_shadeSelection", false);
                 RestrictToSelected = EditorPrefs.GetBool(prefix + "_restrictToSelected", true);
                 SelectionCommandsFoldout = EditorPrefs.GetBool(prefix + "_selectionCommandsFoldout", true);
+
+                btnImportOBJ = new GUIContent(
+                    "Import OBJ..", 
+                    EditorGUIUtility.IconContent("d_console.warnicon.sml").image,
+                    "WARNING!! Very Experimental!:\nImports back an externally modified mesh as OBJ format.\nPREFERABLY based on the one you previously exported. ");
+                btnExportOBJ = new GUIContent("Export OBJ...", "Export current mesh as OBJ for tweaking...");
             }
 
             public void Save(string prefix)
@@ -629,22 +639,34 @@ namespace DAPolyPaint
             }
             EGL.EndHorizontal();
 
-            EGL.BeginHorizontal();
-            if (GUL.Button("Export OBJ"))
+            using (new EditorGUI.DisabledScope(_target.Skinned))
             {
-                _painter.Export();
-            }
-            if (GUL.Button("Import OBJ"))
-            {
-                _painter.Import();
-                _target.Vertices = _target.Mesh.vertices;
-                _dummyCollider.sharedMesh = _target.Mesh;
+                EGL.BeginHorizontal();
+                if (GUL.Button(_ui.btnExportOBJ))
+                {
+                    var  filePath = EditorUtility.SaveFilePanelInProject("Export as OBJ format...", _target.Mesh.name, "obj", "Select a path and name to export", _lastExportOBJ);
+                    if (!string.IsNullOrEmpty(filePath))
+                    {
+                        _painter.Export(filePath);
+                        _lastExportOBJ = filePath;
+                    }
+                }
+                if (GUL.Button(_ui.btnImportOBJ))
+                {
+                    var filePath = EditorUtility.OpenFilePanel("Import OBJ format... WARNING! Current mesh will be replaced!", _lastExportOBJ, "obj");
+                    if (!string.IsNullOrEmpty(filePath))
+                    {
+                        _painter.Import(filePath);
+                        _target.Vertices = _target.Mesh.vertices;
+                        _dummyCollider.sharedMesh = _target.Mesh;
 
-                _currFace = -1;
-                _paintCursor.TargetMesh = _target.Mesh;
-                _paintCursor.enabled = true;
+                        _currFace = -1;
+                        _paintCursor.TargetMesh = _target.Mesh;
+                        _paintCursor.enabled = true;
+                    }
+                }
+                EGL.EndHorizontal();
             }
-            EGL.EndHorizontal();
 
         }
         

@@ -57,20 +57,20 @@ namespace DAPolyPaint
             IsSelectSub = false;
         }
 
-        public void Export()
+        public void Export(string filePath)
         {
             ObjFormat.Export(
                 _indexedVerts,
                 _indexedFaces,
                 _UVs,
                 _triangles,
-                @"c:\temp\result.obj"
+                filePath
             );
         }
 
-        public void Import()
+        public void Import(string filePath)
         {
-            ObjFormat.ImportToMesh(@"c:\temp\result.obj", _targetMesh);
+            ObjFormat.ImportToMesh(filePath, _targetMesh);
             SetMeshAndRebuild(_targetMesh, null, _textureData);
         }
 
