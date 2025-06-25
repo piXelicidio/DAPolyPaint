@@ -61,12 +61,7 @@ namespace DAPolyPaint
 
         #region --------- User Interface ---------
         const string WindowName = "DAPolyPaint";
-        readonly GUIContent[] _toolNames = {
-            new GUIContent("Brush", "Draw face by face"), 
-            new GUIContent("Fill", "Fill areas (Shortcut: Ctrl)"), 
-            new GUIContent("Loop", "Draw on mesh loops (Shortcut: Ctrl+Shift)"), 
-            new GUIContent("Pick","Get color from mesh (Shortcut: Shift)") 
-        };
+
         readonly string[] _mirrorAxis = new string[] { "X", "Y", "Z" };
         readonly string[] _toolHints = new string[] {
             "Click or Drag over faces", //brush
@@ -111,7 +106,11 @@ namespace DAPolyPaint
             public bool SelectionCommandsFoldout;
 
             public GUIContent btnImportOBJ;
-            public GUIContent btnExportOBJ; 
+            public GUIContent btnExportOBJ;
+            public GUIContent[] toolBarToolAction;
+            public GUIContent[] toolNames;
+
+            internal Texture blueDot;
 
             public void Load(string prefix)
             {
@@ -135,6 +134,30 @@ namespace DAPolyPaint
                     EditorGUIUtility.IconContent("d_console.warnicon.sml").image,
                     "WARNING!! Very Experimental!:\nImports back an externally modified mesh as OBJ format.\nPREFERABLY based on the one you previously exported. ");
                 btnExportOBJ = new GUIContent("Export OBJ...", "Export current mesh as OBJ for tweaking...");
+
+                blueDot = EditorGUIUtility.IconContent("IN foldout focus").image;
+
+                toolBarToolAction = new GUIContent[2];
+                toolBarToolAction[0] = new GUIContent(" Paint", "");
+                toolBarToolAction[1] = new GUIContent(" Select", "");
+
+                toolNames = new GUIContent[] {
+                    new GUIContent("Brush", "Draw face by face"),
+                    new GUIContent("Fill", "Fill areas (Shortcut: Ctrl)"),
+                    new GUIContent("Loop", "Draw on mesh loops (Shortcut: Ctrl+Shift)"),
+                    new GUIContent("","Pick color from mesh (Shortcut: Shift)")
+                };
+                toolNames[3].image = EditorGUIUtility.IconContent("d_color_picker").image;
+            }
+
+            public void ToolActionUpdate(int value)
+            {
+                for (int i = 0; i < toolBarToolAction.Length; ++i)
+                {
+                    if (i==value) 
+                        toolBarToolAction[i].image = blueDot; 
+                    else toolBarToolAction[i].image = null;
+                }
             }
 
             public void Save(string prefix)
@@ -319,7 +342,7 @@ namespace DAPolyPaint
             OnGUI_InputEvents();
 
             //Big PAINT MODE button
-            _scrollPos = EGL.BeginScrollView(_scrollPos);
+           
             using (new EditorGUI.DisabledScope(_target.Tex == null))
             {
                 if (!_paintingMode)
@@ -335,7 +358,9 @@ namespace DAPolyPaint
                 }
             }
 
-            OnGUI_ObjectStatus();
+             OnGUI_ObjectStatus();
+
+            _scrollPos = EGL.BeginScrollView(_scrollPos);
             OnGUI_TexturePalette();
             
 
@@ -364,13 +389,13 @@ namespace DAPolyPaint
 
         private void OnGUI_Settings()
         {
-            GUL.BeginVertical(EditorStyles.textArea);
+            EGL.BeginVertical(EditorStyles.textArea);
             _ui.SettingsFolded = EGL.BeginFoldoutHeaderGroup(_ui.SettingsFolded, "Settings");
             if (_ui.SettingsFolded)
             {
                 _ui.AutoShadedWireframe = EGL.ToggleLeft(Temp.Content("Auto-Shaded Wireframe", "Set Shaded Wrieframe and Camera lighting on Paint Mode"), _ui.AutoShadedWireframe);
             }
-            GUL.EndVertical();
+            EGL.EndVertical();
         }
 
         private void OnGUI_UndoRedo()
@@ -391,7 +416,7 @@ namespace DAPolyPaint
         private void OnGUI_Remapping()
         {
             EGL.Space();
-            GUL.BeginVertical(EditorStyles.textArea);
+            EGL.BeginVertical(EditorStyles.textArea);
 
             var RemapClicked = GUL.Button("Remap to texture in...");                          
             _remapMaterial = (Material) EGL.ObjectField("Target Material", _remapMaterial, typeof(Material), true);
@@ -411,7 +436,7 @@ namespace DAPolyPaint
                 }
             }
 
-            GUL.EndVertical();
+            EGL.EndVertical();
         }
 
         /// <summary>
@@ -472,7 +497,7 @@ namespace DAPolyPaint
         /// </summary>
         private void OnGUI_PaintingTools()
         {
-            GUL.BeginVertical(EditorStyles.textArea);
+            EGL.BeginVertical(EditorStyles.textArea);
             var actionStr = "painting";
             if (_ui.ToolAction > 0) actionStr = _ui.ToolAction == 1 ? "selecting" : "deselecting";
             _ui.ToolsFoldedOut = EGL.BeginFoldoutHeaderGroup(_ui.ToolsFoldedOut, "Tools (" +actionStr + ")");
@@ -482,7 +507,7 @@ namespace DAPolyPaint
 
                 //TODO: toolbar selected parameter can be set to -1 to unselect all buttons.
                 //TOOLBAR of: Brush, Fill, Loop, Pick
-                SetCurrTool(GUL.Toolbar(_currToolCode, _toolNames));
+                SetCurrTool(GUL.Toolbar(_currToolCode, _ui.toolNames));
                     
                 if (_currToolCode >= 0 && _currToolCode <= ToolType.ToolNames.Length)
                 {
@@ -523,7 +548,7 @@ namespace DAPolyPaint
                 
             }
             EGL.EndFoldoutHeaderGroup();
-            GUL.EndVertical();
+            EGL.EndVertical();
 
             OnGUI_ToolAction();
         }
@@ -531,8 +556,9 @@ namespace DAPolyPaint
         
         private void OnGUI_ToolAction()
         {
-            EGL.LabelField("Tool Action:", EditorStyles.miniLabel);
-            _ui.ToolAction = GUL.Toolbar(_ui.ToolAction, new string[] { "paint", "select" });
+            EGL.LabelField("Tool Action:", EditorStyles.miniLabel);            
+            _ui.ToolAction = GUL.Toolbar(_ui.ToolAction, _ui.toolBarToolAction);
+            _ui.ToolActionUpdate(_ui.ToolAction);
             _painter.ToolAction = (ToolAction)_ui.ToolAction;
             PaintCursorDrawer.CurrToolAction = (ToolAction)_ui.ToolAction;
         }
@@ -541,7 +567,7 @@ namespace DAPolyPaint
         {
 
             EGL.Space();
-            GUL.BeginVertical(EditorStyles.textArea);
+            EGL.BeginVertical(EditorStyles.textArea);
             _ui.SelectionCommandsFoldout = EGL.BeginFoldoutHeaderGroup(_ui.SelectionCommandsFoldout, "Selection commands");
             //EGL.LabelField("Selection actions:", EditorStyles.miniLabel);
             if (_ui.SelectionCommandsFoldout)
@@ -556,14 +582,24 @@ namespace DAPolyPaint
                 PaintCursorDrawer.ShadeSelected = _ui.ShadeSelection;
                 _ui.RestrictToSelected = EGL.ToggleLeft("Restrict painting to selected", _ui.RestrictToSelected);
                 _painter.RestrictToSelected = _ui.RestrictToSelected;
-                if (GUL.Button("Move Faces Away"))
+
+                GUL.Label("Move Faces Away:");
+                EGL.BeginHorizontal();
+                if (GUL.Button("+X"))
                 {
                     _painter.MoveFaces(_painter.SelectedFaces, _ui.MoveOffset);
                     _dummyCollider.sharedMesh = _painter.Target;
                     RebuildSelection();
                     SceneView.lastActiveSceneView.Repaint();
                 }
-                //_ui.MoveOffset = EGL.Vector3Field("Offset", _ui.MoveOffset);
+                if (GUL.Button("-X")) {
+                    _painter.MoveFaces(_painter.SelectedFaces, -_ui.MoveOffset);
+                    _dummyCollider.sharedMesh = _painter.Target;
+                    RebuildSelection();
+                    SceneView.lastActiveSceneView.Repaint();
+                }
+                
+                EGL.EndHorizontal();
                 if (GUL.Button("Move All Back"))
                 {
                     _painter.MoveFacesUndoBack();
@@ -573,7 +609,7 @@ namespace DAPolyPaint
                 }
             }
             EGL.EndFoldoutHeaderGroup();
-            GUL.EndVertical();
+            EGL.EndVertical();
         }
 
         private void OnGUI_InputEvents()
