@@ -153,7 +153,7 @@ namespace DAPolyPaint
         {
             var ew =(PolyPaintWindow) EditorWindow.GetWindow(typeof(PolyPaintWindow));
             if (ew._painter == null) ew._painter = new Painter();
-            ew.titleContent = new GUIContent("DA Poly Paint");
+            ew.titleContent = new GUIContent("DA Poly Paint - v0.9.7");
         }
 
         public void CreateGUI()

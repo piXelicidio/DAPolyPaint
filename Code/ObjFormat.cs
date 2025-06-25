@@ -16,7 +16,7 @@ namespace DAPolyPaint
         /// uvs: list of all UV coordinates  
         /// uvFaces: per-corner indices into uvs (same length as faces)  
         /// </summary>
-        public static void Export(
+        public static bool Export(
             Vector3[] verts,
             int[] faces,
             List<Vector2> uvs,
@@ -24,14 +24,19 @@ namespace DAPolyPaint
             string filePath)
         {
             var sb = new StringBuilder();
-
+            sb.AppendLine("# DA PolyPaint OBJ exporter");
+            sb.AppendLine("");
             // write positions
             foreach (var v in verts)
                 sb.AppendLine($"v {v.x} {v.y} {v.z}");
+            sb.AppendLine($"# {verts.Length} vertices");
+            sb.AppendLine();
 
             // write texture verts
             foreach (var uv in uvs)
                 sb.AppendLine($"vt {uv.x} {uv.y}");
+            sb.AppendLine($"# {uvs.Count} texture coords");
+            sb.AppendLine();
 
             // write faces: f v1/vt1 v2/vt2 v3/vt3
             for (int i = 0; i < faces.Length; i += 3)
@@ -46,8 +51,17 @@ namespace DAPolyPaint
 
                 sb.AppendLine($"f {v0}/{t0} {v1}/{t1} {v2}/{t2}");
             }
-
-            File.WriteAllText(filePath, sb.ToString());
+            sb.AppendLine($"# {faces.Length / 3} faces"); 
+            try
+            {
+                File.WriteAllText(filePath, sb.ToString());
+            }
+            catch
+            {
+                Debug.Log($"Error writing file: {filePath}");
+                return false;
+            }
+            return true;
         }
 
         /// <summary>
@@ -56,7 +70,7 @@ namespace DAPolyPaint
         ///  - uvs:   list of all "vt" coords  
         ///  - faces: one ObjFace per corner of each triangle (ignores extra verts on a polygon)  
         /// </summary>
-        public static void Import(
+        public static bool Import(
             string filePath,
             out List<Vector3> verts,
             out List<Vector2> uvs,
@@ -67,10 +81,23 @@ namespace DAPolyPaint
             var normals = new List<Vector3>();
             faces = new List<ObjFace>();
 
-            foreach (var raw in File.ReadLines(filePath))
+            string[] allLines;
+            try
+            {
+                allLines = File.ReadAllLines(filePath);
+            }
+            catch 
+            {
+                Debug.Log($"Error reading file: {filePath}");
+                return false;
+            }
+
+            foreach (var raw in allLines)
             {
                 if (raw.Length < 2 || raw[0] == '#') continue;
+
                 var parts = raw.Trim().Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+
                 switch (parts[0])
                 {
                     case "v":
@@ -116,6 +143,7 @@ namespace DAPolyPaint
                         break;
                 }
             }
+            return true;
         }
 
         public static void ImportToMesh(string filePath, Mesh mesh)
