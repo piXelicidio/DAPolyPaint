@@ -354,25 +354,32 @@ namespace DAPolyPaint
                     link.pOut = 3 - (pos[0] + pos[1]); //point left out
 
                     var otherFaceSide = GetTriangleSide(posOther[0], posOther[1]);
-                    var otherLink = _faceConnectionsBySide[face2,otherFaceSide];
-                    bool otherOk = otherLink == null;
-                    if (!otherOk)
-                    {
-                        otherOk = otherLink.with == face1;
-                    }
+                    var otherLink = _faceConnectionsBySide[face2, otherFaceSide];
+
+                    bool otherOk = otherLink == null || otherLink.with == face1;
 
                     //my face side is unlinked?                    
                     if (_faceConnectionsBySide[face1, link.side] == null && otherOk)
                     {
                         //other face has this side unlinked or linked to me?                    
-
-                        _AllFaceConnections[face1].Add(link);
-                        _faceConnectionsBySide[face1, link.side] = link;
+                        if (_AllFaceConnections[face1].Count < 3)
+                        {
+                            _AllFaceConnections[face1].Add(link);
+                            _faceConnectionsBySide[face1, link.side] = link;
+                        }
+                        else
+                        {
+                            Debug.LogWarning("Graph trying to add a 4th connection to a face!");
+                        }
                     }
+                }
+                else if (count == 3) 
+                {
+                    Debug.LogWarning("Found overalpping faces");
                 }
             }
 
-            var sum = 0.0f;
+            //var sum = 0.0f;
             _AllFaceConnections = new List<FaceLink>[NumFaces];
             _faceConnectionsBySide = new FaceLink[NumFaces,3];
             for (int i = 0; i < NumFaces; i++)
@@ -380,6 +387,7 @@ namespace DAPolyPaint
                 _AllFaceConnections[i] = new List<FaceLink>();
             }
 
+            //Narrows the search by faces that already  have at least a vertex in common
             var myVerts = new int[3];
             for (int i = 0; i < NumFaces; i++)
             {
@@ -390,23 +398,45 @@ namespace DAPolyPaint
                 }
             }
 
-            //backlinks
-            for (int i = 0; i < NumFaces; i++)
+            //clean bad backlinks pass, from weird meshes
+            for (int thisFace = 0; thisFace < NumFaces; thisFace++)
             {
-                var links = _AllFaceConnections[i];
-                sum += links.Count;
-                for (int j = links.Count - 1; j >= 0; j--)
+                var thisFaceLinks = _AllFaceConnections[thisFace];
+                //sum += links.Count;
+                for (int j = thisFaceLinks.Count - 1; j >= 0; j--)
                 {
-                    var backlink = _AllFaceConnections[links[j].with].Find(x => x.with == i);
+                    var backlink = _AllFaceConnections[thisFaceLinks[j].with].Find(x => x.with == thisFace);
+                    if (backlink == null)
+                    {
+                        Debug.LogWarning("Fixing bad backlinks");
+                        var flink = thisFaceLinks[j];
+                        thisFaceLinks.RemoveAt(j);
+                        //link should be removed also from _faceConnectionsBySide
+                        for (int i = 0; i < 3; i++)
+                        {
+                            if (_faceConnectionsBySide[thisFace, i] == flink) _faceConnectionsBySide[thisFace, i] = null;
+                        }
+                    }
+
+                }
+            }
+
+            //backlinks
+            for (int thisFace = 0; thisFace < NumFaces; thisFace++)
+            {
+                var thisFaceLinks = _AllFaceConnections[thisFace];
+                //sum += links.Count;
+                for (int j = thisFaceLinks.Count - 1; j >= 0; j--)
+                {
+                    var backlink = _AllFaceConnections[thisFaceLinks[j].with].Find(x => x.with == thisFace);
                     if (backlink != null)
                     {
                         backlink.backLinkIdx = j;
                     } else
                     {
-                        //Debug.LogWarning("Backlink not found. Removing link.");
-                        DebugFace(i);
-                        DebugFace(links[j].with);
-                        links.RemoveAt(j);
+                        Debug.LogWarning("Still Backlink not found!  Shouldn't be happening.");
+                        DebugFace(thisFace);
+                        DebugFace(thisFaceLinks[j].with);                        
                     }
 
                 }
@@ -454,10 +484,11 @@ namespace DAPolyPaint
             {
                 var linkTo = _AllFaceConnections[face][i];
                 var faceOther = linkTo.with;
-                var linkFrom = _AllFaceConnections[faceOther][linkTo.backLinkIdx];
+                var linkFrom = _AllFaceConnections[faceOther][linkTo.backLinkIdx]; //TODO: get rid of this?
                 if (linkFrom.with != face)
                 {
                     Debug.LogWarning("Bad backlinkIdx!");
+                    continue;
                 }
 
 
@@ -968,6 +999,7 @@ namespace DAPolyPaint
     /// </summary>
     public class FaceLink
     {
+        //TODO: this needs an infographic!!
         public int with;            //linked with which other face?
         public int p1, p2;          //shared vertices, as position index in the face 0,1 or 2;
         public Edge edge;           //shared vertices numbers
