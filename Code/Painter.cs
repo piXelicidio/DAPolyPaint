@@ -1,14 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Security.Cryptography;
 using UnityEngine;
+using static UnityEngine.GraphicsBuffer;
 
- 
+
 namespace DAPolyPaint 
 {
     /// <summary>
     /// Deals with Mesh and UV painting functions. Can be used in play mode.
+    /// It prepares mesh data, applies UV-based colors to faces, handles topological relationships.
     /// </summary>
     //Doesn't know anything about UI or GameObjects. 
     //Many field/variable names are selected based on the 3ds Max Poly Paint tool implementation
@@ -16,87 +17,132 @@ namespace DAPolyPaint
     public class Painter
     {
         Mesh _targetMesh;
-        bool _skinned;
+        Mesh _skinnedMesh;
         List<Vector2> _UVs;
         Vector3[] _vertices;            //all non optimized vertices of the actual mesh
+        Vector3[] _verticesBackup = null;
         Vector3[] _indexedVerts;
-        private List<int>[] _facesUsingVert;
-        int[] _triangles;
-        int[] _indexedFaces;
+        List<int>[] _facesUsingVert;
+        int[] _triangles;               // the raw mesh triangles (one‐to‐one per duplicated vertex) points to _vertices
+        int[] _indexedFaces;            // triangles pointing to indexed vertices _indexedVerts
         float[] _angles;                //angle of each triangle corners
-        List<FaceLink>[] _faceLinks;
-        FaceData[] _faceData;
+        List<FaceLink>[] _AllFaceConnections;
+        FaceLink[,] _faceConnectionsBySide;
         List<List<Vector2>> _undoLevels;
+        HashSet<int> _selectedFaces = new HashSet<int>();
+        HashSet<int> _hiddenFaces = new HashSet<int>();
         int _undoPos;
-        private int _undoSequenceCount;
+        int _undoSequenceCount;
         int _channel = 0;
         Texture2D _textureData;
-        private MeshCopy _oldMesh;
+        MeshCopy _meshCopy;
+        private MeshCopy _skinnedMeshCopy;
 
+        public ToolAction ToolAction { get; set; }
+        public bool IsSelectSub {get; set;}
         public Mesh Target { get { return _targetMesh; } }
         public int NumUVCalls { get; private set; }
         public int NumFaces { get { return _triangles.Length / 3; } }
         public int NumVerts { get { return _vertices.Length; } }
         public float QuadTolerance { get; set; }
+        public HashSet<int> SelectedFaces { get { return _selectedFaces; } }
+        public bool RestrictToSelected { get; set; } = true;
+        public Vector3[] Vertices { get { return _vertices; }}
+
 
         public Painter()
         {
             QuadTolerance = 120;
             _undoLevels = new List<List<Vector2>>();
+            IsSelectSub = false;
+        }
+
+        public void Export(string filePath)
+        {
+            ObjFormat.Export(
+                _indexedVerts,
+                _indexedFaces,
+                _UVs,
+                _triangles,
+                filePath
+            );
+        }
+
+        public void Import(string filePath)
+        {
+            ObjFormat.ImportToMesh(filePath, _targetMesh);
+            SetMeshAndRebuild(_targetMesh, null, _textureData);
         }
 
         /// <summary>
         /// Set the mesh to be painted and rebuild the internal data structures.
         /// </summary>        
         //THIS NEED to be called first before any other painting function. TODO: maybe put in the constructor?
-        public void SetMeshAndRebuild(Mesh target, bool skinned, Texture2D texture)
+        public void SetMeshAndRebuild(Mesh target, Mesh skinnedMesh, Texture2D texture)
         {
             _targetMesh = target;
-            _skinned = skinned;
+            _skinnedMesh = skinnedMesh;
             _textureData = texture;
-            RebuildMeshForPainting();
+            _skinnedMeshCopy = null;
+            _verticesBackup = null;
+            RebuildMeshForPainting();            
         }
 
-        ///<summary>Rebuild the mesh data to get ready for painting.</summary>
+        /// <summary>
+        /// Transforms the input mesh into an internal, per-face representation optimized for UV painting,
+        /// and builds all necessary topological data structures (e.g., face graph, indexed vertices).
+        /// </summary>
         void RebuildMeshForPainting()
         {
-            var t = Environment.TickCount;
-            Debug.Log("<b>Preparing mesh...</b> ");
-            var m = _targetMesh;
+            var t = Environment.TickCount;                        
 
-            //var tris = m.triangles;
-            //var vertices = m.vertices;
-            //var UVs = m.uv; //channel 0 
-            //var normals = m.normals;
-            //var boneWeights = m.boneWeights;
+            _meshCopy = new MeshCopy(_targetMesh); 
+            if (_skinnedMesh != null)  _skinnedMeshCopy = new MeshCopy(_skinnedMesh);
 
-            _oldMesh = new MeshCopy(m);
+            // If UVs are missing or the wrong size, create default UVs
+            if (_meshCopy.UVs == null || _meshCopy.UVs.Count != _meshCopy.vertices.Count)
+            {
+                _meshCopy.UVs = new List<Vector2>(_meshCopy.vertices.Count);
+                for (int i = 0; i < _meshCopy.UVs.Count; i++)
+                {
+                    // Simple planar mapping as a fallback (can be improved)
+                    _meshCopy.UVs.Add(new Vector2(_meshCopy.vertices[i].x, _meshCopy.vertices[i].z));
+                }
+            }
+
 
             var newVertices = new List<Vector3>();
             var newUVs = new List<Vector2>();
             var newTris = new List<int>();
             var newNormals = new List<Vector3>();
-            var newBW = new BoneWeight[_oldMesh.tris.Length];
+            var newBW = new BoneWeight[0];
+            if (_skinnedMesh) newBW = new BoneWeight[_meshCopy.tris.Count];
+
+            var newVerticesSkinned = new List<Vector3>();
+            var newNormalsSkinned = new List<Vector3>();
 
             //no more shared vertices, each triangle will have its own 3 vertices.
-            for (int i = 0; i < _oldMesh.tris.Length; i++)
+            for (int i = 0; i < _meshCopy.tris.Count; i++)
             {
-                var idx = _oldMesh.tris[i];
+                var idx = _meshCopy.tris[i];
                 newTris.Add(i);
-                newVertices.Add(_oldMesh.vertices[idx]);
-                newNormals.Add(_oldMesh.normals[idx]);
+                newVertices.Add(_meshCopy.vertices[idx]);
+                newNormals.Add(_meshCopy.normals[idx]);
                 //also UVs but the 3 values will be the same
-                newUVs.Add(_oldMesh.UVs[_oldMesh.tris[i - i % 3]]);
+                newUVs.Add(_meshCopy.UVs[_meshCopy.tris[i - i % 3]]);
 
-                if (_skinned)
+                if (_skinnedMesh)
                 {
-                    newBW[i] = _oldMesh.boneWeights[idx];
+                    newVerticesSkinned.Add(_skinnedMeshCopy.vertices[idx]);
+                    newNormalsSkinned.Add(_skinnedMeshCopy.normals[idx]);
+                    newBW[i] = _skinnedMeshCopy.boneWeights[idx];
                 }
             }
 
 
             _UVs = newUVs; //keep ref for painting
             _vertices = newVertices.ToArray();
+            //_verticesBackup = newVertices.ToArray();
             _triangles = newTris.ToArray();
 
 
@@ -118,36 +164,53 @@ namespace DAPolyPaint
             BuildFaceGraph();
             Undo_Reset();
             s += "<b>BuildFaceGraph, Elapsed:</b> " + (Environment.TickCount - t).ToString() + "ms";
-            Debug.Log(s);
+            //Debug.Log(s);
 
             //updating mesh with new distribution of vertices
-            m.Clear();
-            if (newVertices.Count > 60000) m.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
-            if (m.subMeshCount > 1) m.subMeshCount = 1; //NOT support for multiple submeshes.
-            m.SetVertices(newVertices);
-            m.SetUVs(_channel, newUVs);
-            m.SetTriangles(newTris, 0);
-            m.SetNormals(newNormals);
+            _targetMesh.Clear();
+            if (newVertices.Count > 60000) _targetMesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
+            if (_targetMesh.subMeshCount > 1) _targetMesh.subMeshCount = 1; //NOT support for multiple submeshes.
+            _targetMesh.SetVertices(newVertices);
+            _targetMesh.SetUVs(_channel, newUVs);
+            _targetMesh.SetTriangles(newTris, 0);
+            _targetMesh.SetNormals(newNormals);
 
-            if (_skinned)
+            if (_skinnedMesh)
             {
+                _skinnedMesh.Clear();
+                if (newVertices.Count > 60000) _skinnedMesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
+                if (_skinnedMesh.subMeshCount > 1) _skinnedMesh.subMeshCount = 1;
+                _skinnedMesh.SetVertices(newVerticesSkinned);
+                _skinnedMesh.SetUVs(_channel, newUVs); //same as non-skinned
+                _skinnedMesh.SetTriangles(newTris, 0);
+                _skinnedMesh.SetNormals(newNormalsSkinned);
                 //TODO(maybe later): Use the more complex new SetBoneWeights to support more than 4 bones per vertex
-                m.boneWeights = newBW;
+                _skinnedMesh.boneWeights = newBW;
             }
 
 
+        }
+
+        public void UpdateSkinnedUVS()
+        {
+            if (_skinnedMesh != null)
+            {
+                _skinnedMesh.SetUVs(_channel, _UVs);
+            }
         }
 
         //After calling RestoreOldMesh, all other painting functions will fail, unless you call RebuildMeshForPainting again.
         public void RestoreOldMesh()
         {
             Debug.Log("Restoring mesh...");
-            _oldMesh.PasteTo(_targetMesh);
+            _meshCopy.PasteTo(_targetMesh);
         }
 
 
-
-        ///<summary>Defines a new indexed view of the mesh, optimized like it was on modeling software source.</summary>
+        /// <summary>
+        /// Creates an optimized, indexed view of the mesh's vertices and faces,
+        /// mapping original (un-indexed) vertices to unique shared vertex indices for topological operations.
+        /// </summary>        
         //Needed for geting relationships between faces, edges, verts.
         //_indexedVerts store unique vertices
         //_indexedFaces every 3 values are 3 indexes pointing to _indexedVerts values.
@@ -190,112 +253,6 @@ namespace DAPolyPaint
             //Debug.Log(String.Format("NumVerts before:{0} after:{1} dumbSymmetryTest:{2}", NumVerts, sharedVerts.Count, dumbSymmetryTest));
         }
 
-        //no-Dictionary version of Indexify (200x slower)
-        private void Indexify_noDic()
-        {
-            var sharedVerts = new List<Vector3>();
-            var indexReplace = new int[_triangles.Length];
-            var facesUsingVert = new List<List<int>>();
-            _indexedFaces = new int[_triangles.Length];
-            var dumbSymmetryTest = 0;
-
-            for (int i = 0; i < NumVerts; i++)
-            {
-                var v = _vertices[i];
-                var idx = sharedVerts.FindIndex(x => x == v);
-
-                if (idx == -1)
-                {
-                    idx = sharedVerts.Count;
-                    sharedVerts.Add(v);
-                    var list = new List<int>();
-                    list.Add(i / 3);
-                    facesUsingVert.Add(list);
-                    if (v.x > 0) dumbSymmetryTest++; else if (v.x < 0) dumbSymmetryTest--;
-                }
-                indexReplace[i] = idx;
-                facesUsingVert[idx].Add(i / 3);
-            }
-
-            for (int i = 0; i < _triangles.Length; i++)
-            {
-                _indexedFaces[i] = indexReplace[_triangles[i]];
-            }
-            _indexedVerts = sharedVerts.ToArray();
-            _facesUsingVert = facesUsingVert.ToArray();
-
-            //Debug.Log(String.Format("NumVerts before:{0} after:{1} dumbSymmetryTest:{2}", NumVerts, sharedVerts.Count, dumbSymmetryTest));
-        }
-
-        //bounding box check version of Indexify 
-        private void Indexify_boundBox()
-        {
-            var sharedVerts = new List<Vector3>();
-            var indexReplace = new int[_triangles.Length];
-            var facesUsingVert = new List<List<int>>();
-            _indexedFaces = new int[_triangles.Length];
-            var dumbSymmetryTest = 0;
-            Vector3 minBox, maxBox;
-            if (NumVerts > 0)
-            {
-                minBox = _vertices[0];
-                maxBox = _vertices[0];
-                sharedVerts.Add(_vertices[0]);
-                var list = new List<int>();
-                facesUsingVert.Add(list);
-                indexReplace[0] = 0;
-                facesUsingVert[0].Add(0);
-            } else return;
-
-            bool boundBoxContains(Vector3 point)
-            {
-                return point.x >= minBox.x && point.y >= minBox.y && point.z >= minBox.z &&
-                       point.x <= maxBox.x && point.y <= maxBox.y && point.z <= maxBox.z;
-            }
-
-            void boundBoxEncapsulate(Vector3 point)
-            {
-                if (point.x < minBox.x) minBox.x = point.x;
-                if (point.y < minBox.y) minBox.y = point.y;
-                if (point.z < minBox.z) minBox.z = point.z;
-                if (point.x > maxBox.x) maxBox.x = point.x;
-                if (point.y > maxBox.y) maxBox.y = point.y;
-                if (point.z > maxBox.z) maxBox.z = point.z;
-            }
-
-            for (int i = 1; i < NumVerts; i++)
-            {
-                var v = _vertices[i];
-                int idx = -1;
-                if (boundBoxContains(v))
-                {
-                    idx = sharedVerts.FindIndex(x => x == v);
-                }
-
-                if (idx == -1)
-                {
-                    idx = sharedVerts.Count;
-                    sharedVerts.Add(v);
-                    boundBoxEncapsulate(v);
-                    var list = new List<int>();
-                    list.Add(i / 3);
-                    facesUsingVert.Add(list);
-                    if (v.x > 0) dumbSymmetryTest++; else if (v.x < 0) dumbSymmetryTest--;
-                }
-                indexReplace[i] = idx;
-                facesUsingVert[idx].Add(i / 3);
-            }
-
-            for (int i = 0; i < _triangles.Length; i++)
-            {
-                _indexedFaces[i] = indexReplace[_triangles[i]];
-            }
-            _indexedVerts = sharedVerts.ToArray();
-            _facesUsingVert = facesUsingVert.ToArray();
-
-            //Debug.Log(String.Format("NumVerts before:{0} after:{1} dumbSymmetryTest:{2}", NumVerts, sharedVerts.Count, dumbSymmetryTest));
-        }
-
         private void InvalidFaceRemoval()
         {
             for (int i = 0; i < _indexedFaces.Length; i += 3)
@@ -306,6 +263,10 @@ namespace DAPolyPaint
             }
         }
 
+        /// <summary>
+        /// Calculates the angle at each vertex corner for every triangle in the indexed mesh,
+        /// used primarily for quad detection algorithms.
+        /// </summary>
         private void CalcAngles()
         {
             _angles = new float[_indexedFaces.Length];
@@ -333,10 +294,10 @@ namespace DAPolyPaint
             };
         }
 
-        ///<summary> 
-        ///Ggiven unsoreted position p1 p2 (0..2) in a triangle. 
-        ///Return which side number of the triangle it represents.
-        ///</summary>                
+        /// <summary>
+        /// Maps a pair of local vertex indices (0-2) from a triangle to a unique integer
+        /// representing one of the triangle's three sides (0, 1, or 2).
+        /// </summary>           
         private int GetTriangleSide(int p1, int p2)
         {
             var low = Math.Min(p1, p2);
@@ -350,10 +311,17 @@ namespace DAPolyPaint
             }
         }
 
-        /// <summary> build link relatioships between faces </summary>
-        //assumes Indexify() was called before
+        /// <summary>
+        /// Builds a graph of relationships between adjacent faces in the mesh,
+        /// identifying shared edges and storing connection details in FaceLink objects.
+        /// </summary>
+        /// <remarks>
+        /// assumes Indexify() was called before
+        /// </remarks>
         private void BuildFaceGraph()
         {
+            int overlappingFaces = 0;
+
             void FindCoincidences(int face1, int face2)
             {
                 if (face1 == face2) return;
@@ -388,33 +356,40 @@ namespace DAPolyPaint
                     link.pOut = 3 - (pos[0] + pos[1]); //point left out
 
                     var otherFaceSide = GetTriangleSide(posOther[0], posOther[1]);
-                    var otherLink = _faceData[face2].links[otherFaceSide];
-                    bool otherOk = otherLink == null;
-                    if (!otherOk)
-                    {
-                        otherOk = otherLink.with == face1;
-                    }
+                    var otherLink = _faceConnectionsBySide[face2, otherFaceSide];
+
+                    bool otherOk = otherLink == null || otherLink.with == face1;
 
                     //my face side is unlinked?                    
-                    if (_faceData[face1].links[link.side] == null && otherOk)
+                    if (_faceConnectionsBySide[face1, link.side] == null && otherOk)
                     {
                         //other face has this side unlinked or linked to me?                    
-
-                        _faceLinks[face1].Add(link);
-                        _faceData[face1].links[link.side] = link;
+                        if (_AllFaceConnections[face1].Count < 3)
+                        {
+                            _AllFaceConnections[face1].Add(link);
+                            _faceConnectionsBySide[face1, link.side] = link;
+                        }
+                        else
+                        {
+                            Debug.LogWarning("Graph trying to add a 4th connection to a face!");
+                        }
                     }
+                }
+                else if (count == 3) 
+                {
+                    overlappingFaces++;
                 }
             }
 
-            var sum = 0.0f;
-            _faceLinks = new List<FaceLink>[NumFaces];
-            _faceData = new FaceData[NumFaces];
+            //var sum = 0.0f;
+            _AllFaceConnections = new List<FaceLink>[NumFaces];
+            _faceConnectionsBySide = new FaceLink[NumFaces,3];
             for (int i = 0; i < NumFaces; i++)
             {
-                _faceLinks[i] = new List<FaceLink>();
-                _faceData[i] = new FaceData();
+                _AllFaceConnections[i] = new List<FaceLink>();
             }
 
+            //Narrows the search by faces that already  have at least a vertex in common
             var myVerts = new int[3];
             for (int i = 0; i < NumFaces; i++)
             {
@@ -425,28 +400,54 @@ namespace DAPolyPaint
                 }
             }
 
-            //backlinks
-            for (int i = 0; i < NumFaces; i++)
+            int badConnections = 0;
+            //clean bad backlinks pass, from weird meshes
+            for (int thisFace = 0; thisFace < NumFaces; thisFace++)
             {
-                var links = _faceLinks[i];
-                sum += links.Count;
-                for (int j = links.Count - 1; j >= 0; j--)
+                var thisFaceLinks = _AllFaceConnections[thisFace];
+                //sum += links.Count;
+                for (int j = thisFaceLinks.Count - 1; j >= 0; j--)
                 {
-                    var backlink = _faceLinks[links[j].with].Find(x => x.with == i);
+                    var backlink = _AllFaceConnections[thisFaceLinks[j].with].Find(x => x.with == thisFace);
+                    if (backlink == null)
+                    {
+                        badConnections ++;
+                        var flink = thisFaceLinks[j];
+                        thisFaceLinks.RemoveAt(j);
+                        //link should be removed also from _faceConnectionsBySide
+                        for (int i = 0; i < 3; i++)
+                        {
+                            if (_faceConnectionsBySide[thisFace, i] == flink) _faceConnectionsBySide[thisFace, i] = null;
+                        }
+                    }
+
+                }
+            }
+
+            //backlinks
+            for (int thisFace = 0; thisFace < NumFaces; thisFace++)
+            {
+                var thisFaceLinks = _AllFaceConnections[thisFace];
+                //sum += links.Count;
+                for (int j = thisFaceLinks.Count - 1; j >= 0; j--)
+                {
+                    var backlink = _AllFaceConnections[thisFaceLinks[j].with].Find(x => x.with == thisFace);
                     if (backlink != null)
                     {
                         backlink.backLinkIdx = j;
                     } else
                     {
-                        //Debug.LogWarning("Backlink not found. Removing link.");
-                        DebugFace(i);
-                        DebugFace(links[j].with);
-                        links.RemoveAt(j);
+                        Debug.LogWarning("Backlink not found! Shouldn't be happening.");
+                        DebugFace(thisFace);
+                        DebugFace(thisFaceLinks[j].with);                        
                     }
 
                 }
             }
-            //Debug.Log("Average Num Links: " + (sum / NumFaces).ToString());
+            if (overlappingFaces > 0 || badConnections > 0)
+            {
+                Debug.LogWarning($"Found funky mesh topology: Multiple overlapping faces, and veritces. Some tools my not not perform 100% correctly.");
+            }
         }
 
         void DebugFace(int faceIdx)
@@ -472,8 +473,10 @@ namespace DAPolyPaint
 
 
         /// <summary>
-        /// Finds the best neighbor face to complete a quad.
+        /// Finds the adjacent face that, when combined with the input face, forms a quad,
+        /// based on angle proximity to 90 degrees.
         /// </summary>
+        /// <returns>The index of the detected quad-brother face, or -1 if not found.</returns>
         /// <param name="face"></param>
         /// <param name="tolerance"></param>
         /// <returns>Face index or -1 if not found.</returns>
@@ -483,14 +486,15 @@ namespace DAPolyPaint
             var best = -1;
             var nearBest = QuadTolerance;
 
-            for (int i = 0; i < _faceLinks[face].Count; i++)
+            for (int i = 0; i < _AllFaceConnections[face].Count; i++)
             {
-                var linkTo = _faceLinks[face][i];
+                var linkTo = _AllFaceConnections[face][i];
                 var faceOther = linkTo.with;
-                var linkFrom = _faceLinks[faceOther][linkTo.backLinkIdx];
+                var linkFrom = _AllFaceConnections[faceOther][linkTo.backLinkIdx]; 
                 if (linkFrom.with != face)
                 {
                     Debug.LogWarning("Bad backlinkIdx!");
+                    continue;
                 }
 
 
@@ -517,16 +521,50 @@ namespace DAPolyPaint
         }
 
 
-        public void SetUV(int face, Vector2 uvc, bool update = true)
+        public void Set(int face, Vector2 uvc)
         {
-            if (face >= 0)
+            switch (ToolAction)
             {
-                _UVs[face * 3] = uvc;
-                _UVs[face * 3 + 1] = uvc;
-                _UVs[face * 3 + 2] = uvc;
-                if (update) _targetMesh.SetUVs(_channel, _UVs);  //could be improved if Start, Length parameters actually worked                
-                NumUVCalls++;
+                case ToolAction.Paint:
+                    if (face >= 0) {
+                        if (!RestrictToSelected || _selectedFaces.Count == 0 || _selectedFaces.Contains(face) )
+                        {
+                            _UVs[face * 3] = uvc;
+                            _UVs[face * 3 + 1] = uvc;
+                            _UVs[face * 3 + 2] = uvc;
+                            NumUVCalls++;
+                        }
+                    }
+                    break;
+                case ToolAction.Select when !IsSelectSub:
+                    _selectedFaces.Add(face);
+                    break;
+                case ToolAction.Select when IsSelectSub:
+                    _selectedFaces.Remove(face);
+                    break;
             }
+        }
+
+
+        public void RefreshUVs()
+        {
+            _targetMesh.SetUVs(_channel, _UVs);
+        }
+
+        public void MoveFaces(HashSet<int> faces, Vector3 vec)
+        {
+            if (_verticesBackup == null)
+            {
+                _verticesBackup = new Vector3[_vertices.Length];
+                Array.Copy(_vertices, _verticesBackup, _vertices.Length);
+            }
+            foreach (var face in faces)
+            {
+                _vertices[_triangles[face * 3]] += vec;
+                _vertices[_triangles[face * 3+1]] += vec;
+                _vertices[_triangles[face * 3+2]] += vec;
+            }
+            _targetMesh.SetVertices(_vertices);
         }
 
         //A face actually have 3 UV values but, here all are the same
@@ -544,21 +582,24 @@ namespace DAPolyPaint
 
         public void FullRepaint(Vector2 uvc)
         {
-            for (int i = 0; i < _UVs.Count; i++)
+            for (int i = 0; i < NumFaces; i++)
             {
-                _UVs[i] = uvc;
+                Set(i, uvc);
             }
-            _targetMesh.SetUVs(_channel, _UVs);
+            RefreshUVs();
         }
 
 
 
         public List<FaceLink> GetFaceLinks(int face)
         {
-            return _faceLinks[face];
+            return _AllFaceConnections[face];
         }
 
-
+        /// <summary>
+        /// Fills a contiguous region of faces with a specified UV color,
+        /// either by matching the starting face's original color or by simply filling all connected faces.
+        /// </summary>
         public void FillPaint(int startFace, Vector2 uvc, bool DontCheckColor = false)
         {
             var bk_pixelColor = GetTextureColor(GetUV(startFace));
@@ -575,12 +616,9 @@ namespace DAPolyPaint
                 //paint border
                 foreach (int face in border)
                 {
-                    _UVs[face * 3] = uvc;
-                    _UVs[face * 3 + 1] = uvc;
-                    _UVs[face * 3 + 2] = uvc;
+                    Set(face, uvc);
                     visited[face] = true;
                 }
-                _targetMesh.SetUVs(_channel, _UVs);  //can be called at the end just once
                 //find neighbors
                 neighbors.Clear();
 
@@ -610,15 +648,17 @@ namespace DAPolyPaint
 
                 iters++;
             } while (border.Count > 0 && iters < 1000);  //TODO: Improve this arbitrary limit
+            RefreshUVs(); 
+
             //Debug.Log(String.Format("Iters:{0} Elapsed:{1}ms", iters, Environment.TickCount - t));
         }
 
         public Color GetTextureColor(Vector2 uv)
         {
             if (_textureData == null)
-                return Color.white;
+                return Color.white.linear;
             else
-                return _textureData.GetPixel((int)(uv.x * _textureData.width), (int)(uv.y * _textureData.height));
+                return _textureData.GetPixel((int)(uv.x * _textureData.width), (int)(uv.y * _textureData.height)).linear;
         }
 
         /// <summary>
@@ -628,7 +668,7 @@ namespace DAPolyPaint
         {
             if (fromFace != -1 && toFace != 1)
             {
-                foreach (var fl in _faceLinks[fromFace])
+                foreach (var fl in _AllFaceConnections[fromFace])
                 {
                     if (fl.with == toFace)
                     {
@@ -640,7 +680,7 @@ namespace DAPolyPaint
         }
 
         /// <summary>
-        /// Given two adjacent faces (f1 and f2), find a loop.
+        /// Identifies a continuous loop of quads (pairs of adjacent faces) starting from the shared edge of two input faces.
         /// </summary>
         public HashSet<int> FindLoop(int f1, int f2)
         {
@@ -668,7 +708,7 @@ namespace DAPolyPaint
 
                     var SharedEdge_f1_f2 = linkToF2.edge;
                     var jumpToFace = -1;
-                    foreach (FaceLink fl in _faceLinks[f2_quadBro])
+                    foreach (FaceLink fl in _AllFaceConnections[f2_quadBro])
                     {
                         if (!fl.edge.HaveSharedVerts(SharedEdge_f1_f2))
                         {
@@ -727,7 +767,7 @@ namespace DAPolyPaint
                 {
                     _UVs[i] = state[i];
                 }
-                _targetMesh.SetUVs(_channel, _UVs);
+                RefreshUVs();
                 _undoPos--;
                 _undoSequenceCount++;
             }
@@ -745,7 +785,7 @@ namespace DAPolyPaint
                 {
                     _UVs[i] = state[i];
                 }
-                _targetMesh.SetUVs(_channel, _UVs);
+                RefreshUVs();
             }
         }
 
@@ -754,6 +794,9 @@ namespace DAPolyPaint
             return _undoPos > 0;
         }
 
+        /// <summary>
+        /// Paints all faces in the mesh that currently have the same color as the specified starting face with the new UV color.
+        /// </summary>
         public void FillReplace(int face, Vector2 UV)
         {
             //Debug.Log("Replacing...");
@@ -764,13 +807,16 @@ namespace DAPolyPaint
                 {
                     if (GetTextureColor(GetUV(i)) == pick)
                     {
-                        SetUV(i, UV, false);
+                        Set(i, UV);
                     }
                 }
-                _targetMesh.SetUVs(_channel, _UVs);
+                RefreshUVs();
             }
         }
 
+        /// <summary>
+        /// Paints all connected faces of a mesh element with the new UV color, regardless of their current color.
+        /// </summary>
         public void FillElement(int face, Vector2 UV)
         {
             FillPaint(face, UV, true);
@@ -784,6 +830,10 @@ namespace DAPolyPaint
             }
         };
 
+        /// <summary>
+        /// Reassigns the UVs of all mesh faces by finding the closest color match on a new target texture,
+        /// effectively remapping the painted model to a different color palette.
+        /// </summary>
         public bool RemapTo(Texture2D tex2d, bool switchTexture = false)
         {
             var pixels = tex2d.GetPixelData<Color32>(0);
@@ -882,7 +932,7 @@ namespace DAPolyPaint
                 Color newColor;
                 Vector2 newUV;
                 findNearest(oldColor, out newColor, out newUV);   
-                SetUV(i, newUV, false);
+                Set(i, newUV);
             }
             RefreshUVs();
             if (switchTexture) _textureData = tex2d;
@@ -890,27 +940,48 @@ namespace DAPolyPaint
             return true;
         }
 
-        private void RefreshUVs()
+        public void GetFaceVerts(int face, List<Vector3> verts, Matrix4x4 transformMat)
         {
-            _targetMesh.SetUVs(_channel, _UVs);
+            verts.Clear();
+            if (face > -1)
+            {
+                    verts.Add(transformMat.MultiplyPoint3x4(_vertices[face * 3]));
+                    verts.Add(transformMat.MultiplyPoint3x4(_vertices[face * 3 + 1]));
+                    verts.Add(transformMat.MultiplyPoint3x4(_vertices[face * 3 + 2]));
+            }
+        }
+
+        public void MoveFacesUndoBack()
+        {
+            if (_verticesBackup != null)
+            {
+                Array.Copy(_verticesBackup, _vertices, Vertices.Length);
+                _targetMesh.SetVertices(_vertices);
+                SelectedFaces.Clear(); //TODO: temporal patch, before fixing the selection that is not updated when faces are undo back
+            }
         }
     }
 
+    /// <summary>
+    /// A utility class for creating and restoring a copy of a Unity Mesh's essential data.
+    /// Used for undo/redo functionality for the entire mesh structure.
+    /// </summary>
     public class MeshCopy
     {
-        public int[] tris;
-        public Vector3[] vertices;
-        public Vector2[] UVs; //channel 0 
-        public Vector3[] normals;
-        public BoneWeight[] boneWeights;
-        
+        public List<int> tris = new List<int>();
+        public List<Vector3> vertices = new List<Vector3>();
+        public List<Vector2> UVs = new List<Vector2>();  // channel 0
+        public List<Vector3> normals = new List<Vector3>();
+        public List<BoneWeight> boneWeights = new List<BoneWeight>();
+
+
         public MeshCopy(Mesh m)
         {
-            tris = m.triangles;
-            vertices = m.vertices;
-            UVs = m.uv;
-            normals = m.normals;
-            boneWeights = m.boneWeights;            
+            tris = m.triangles.ToList();
+            vertices = m.vertices.ToList();
+            UVs = m.uv.ToList();
+            normals = m.normals.ToList();
+            boneWeights = m.boneWeights.ToList();            
         }
 
         public void PasteTo(Mesh m)
@@ -918,22 +989,23 @@ namespace DAPolyPaint
             if (m != null)
             {
                 m.Clear();
-                if (vertices.Length > 60000) m.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
-                m.SetVertices(new List<Vector3>(vertices)); //  order is important.
-                m.SetUVs(0, new List<Vector2>(UVs));
-                m.SetTriangles(new List<int>(tris), 0);
-                m.SetNormals(new List<Vector3>(normals));
-                m.boneWeights = boneWeights;
+                if (vertices.Count > 60000) m.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
+                m.SetVertices(vertices); //  order is important.
+                m.SetUVs(0, UVs);
+                m.SetTriangles(tris, 0);
+                m.SetNormals(normals);
+                m.boneWeights = boneWeights.ToArray();
             }
         }
     }
 
-    
+
     /// <summary>
-    /// Stores the link relationship between two adjacent faces.
+    /// Stores the topological relationship between two adjacent faces in the mesh.
     /// </summary>
     public class FaceLink
     {
+        //TODO: this needs an infographic!!
         public int with;            //linked with which other face?
         public int p1, p2;          //shared vertices, as position index in the face 0,1 or 2;
         public Edge edge;           //shared vertices numbers
@@ -941,17 +1013,12 @@ namespace DAPolyPaint
         public int pOut;            //the vertice point that is not shared.
         public int backLinkIdx;     //position index on the other face List of links corresponding to this link O.o capichi      
     }
+    
 
-    public class FaceData
-    {
-        public FaceLink[] links;        
-
-        public FaceData()
-        {
-            links = new FaceLink[3];
-        }
-    }
-
+    /// <summary>
+    /// Represents an edge in the mesh defined by two vertex indices.
+    /// Provides methods for checking equality and shared vertices between edges.
+    /// </summary>
     public struct Edge
     {
         public int v1, v2;
@@ -972,5 +1039,7 @@ namespace DAPolyPaint
             return (v1 == other.v1 || v1 == other.v2 || v2 == other.v1 || v2 == other.v2);
         }
     }
+
+    public enum ToolAction { Paint = 0, Select = 1 }
 
 }
