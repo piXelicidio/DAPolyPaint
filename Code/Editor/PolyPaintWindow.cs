@@ -742,13 +742,13 @@ namespace DAPolyPaint
             Mesh meshToSave = (_target.Skinned && _target.SkinnedMesh != null) ? _target.SkinnedMesh : _target.Mesh;
 
             var currentMeshFile = AssetDatabase.GetAssetPath(meshToSave);
-            Debug.Log(currentMeshFile);
+            Debug.Log($"Saving: {currentMeshFile}");
             var projectPath = Path.GetDirectoryName(Application.dataPath);
             Debug.Log(projectPath);
 
             if (string.IsNullOrEmpty(currentMeshFile))
             {
-                Debug.Log("No asset path found for mesh");
+                Debug.LogWarning("No asset path found for mesh");
                 return false;
             }
             else

@@ -164,7 +164,7 @@ namespace DAPolyPaint
             BuildFaceGraph();
             Undo_Reset();
             s += "<b>BuildFaceGraph, Elapsed:</b> " + (Environment.TickCount - t).ToString() + "ms";
-            Debug.Log(s);
+            //Debug.Log(s);
 
             //updating mesh with new distribution of vertices
             _targetMesh.Clear();
@@ -320,6 +320,8 @@ namespace DAPolyPaint
         /// </remarks>
         private void BuildFaceGraph()
         {
+            int overlappingFaces = 0;
+
             void FindCoincidences(int face1, int face2)
             {
                 if (face1 == face2) return;
@@ -375,7 +377,7 @@ namespace DAPolyPaint
                 }
                 else if (count == 3) 
                 {
-                    Debug.LogWarning("Found overalpping faces");
+                    overlappingFaces++;
                 }
             }
 
@@ -398,6 +400,7 @@ namespace DAPolyPaint
                 }
             }
 
+            int badConnections = 0;
             //clean bad backlinks pass, from weird meshes
             for (int thisFace = 0; thisFace < NumFaces; thisFace++)
             {
@@ -408,7 +411,7 @@ namespace DAPolyPaint
                     var backlink = _AllFaceConnections[thisFaceLinks[j].with].Find(x => x.with == thisFace);
                     if (backlink == null)
                     {
-                        Debug.LogWarning("Fixing bad backlinks");
+                        badConnections ++;
                         var flink = thisFaceLinks[j];
                         thisFaceLinks.RemoveAt(j);
                         //link should be removed also from _faceConnectionsBySide
@@ -434,14 +437,17 @@ namespace DAPolyPaint
                         backlink.backLinkIdx = j;
                     } else
                     {
-                        Debug.LogWarning("Still Backlink not found!  Shouldn't be happening.");
+                        Debug.LogWarning("Backlink not found! Shouldn't be happening.");
                         DebugFace(thisFace);
                         DebugFace(thisFaceLinks[j].with);                        
                     }
 
                 }
             }
-            //Debug.Log("Average Num Links: " + (sum / NumFaces).ToString());
+            if (overlappingFaces > 0 || badConnections > 0)
+            {
+                Debug.LogWarning($"Found funky mesh topology: Multiple overlapping faces, and veritces. Some tools my not not perform 100% correctly.");
+            }
         }
 
         void DebugFace(int faceIdx)
@@ -484,7 +490,7 @@ namespace DAPolyPaint
             {
                 var linkTo = _AllFaceConnections[face][i];
                 var faceOther = linkTo.with;
-                var linkFrom = _AllFaceConnections[faceOther][linkTo.backLinkIdx]; //TODO: get rid of this?
+                var linkFrom = _AllFaceConnections[faceOther][linkTo.backLinkIdx]; 
                 if (linkFrom.with != face)
                 {
                     Debug.LogWarning("Bad backlinkIdx!");
