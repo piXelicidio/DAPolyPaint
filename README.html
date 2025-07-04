@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+            <html>
+                <head>                    
+                    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+                    <meta http-equiv="content-type" content="text/html; charset=utf-8">
+                    <title>README.md</title>
+                    <style type="text/css">
+                    /*
+Copyright (c) 2017 Chris Patuzzo
+https://twitter.com/chrispatuzzo
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+*/
+
+body {
+  font-family: Helvetica, arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  padding-top: 10px;
+  padding-bottom: 10px;
+  background-color: white;
+  padding: 30px;
+  color: #333;
+}
+
+body &gt; *:first-child {
+  margin-top: 0 !important;
+}
+
+body &gt; *:last-child {
+  margin-bottom: 0 !important;
+}
+
+a {
+  color: #4183C4;
+  text-decoration: none;
+}
+
+a.absent {
+  color: #cc0000;
+}
+
+a.anchor {
+  display: block;
+  padding-left: 30px;
+  margin-left: -30px;
+  cursor: pointer;
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  margin: 20px 0 10px;
+  padding: 0;
+  font-weight: bold;
+  -webkit-font-smoothing: antialiased;
+  cursor: text;
+  position: relative;
+}
+
+h2:first-child, h1:first-child, h1:first-child + h2, h3:first-child, h4:first-child, h5:first-child, h6:first-child {
+  margin-top: 0;
+  padding-top: 0;
+}
+
+h1:hover a.anchor, h2:hover a.anchor, h3:hover a.anchor, h4:hover a.anchor, h5:hover a.anchor, h6:hover a.anchor {
+  text-decoration: none;
+}
+
+h1 tt, h1 code {
+  font-size: inherit;
+}
+
+h2 tt, h2 code {
+  font-size: inherit;
+}
+
+h3 tt, h3 code {
+  font-size: inherit;
+}
+
+h4 tt, h4 code {
+  font-size: inherit;
+}
+
+h5 tt, h5 code {
+  font-size: inherit;
+}
+
+h6 tt, h6 code {
+  font-size: inherit;
+}
+
+h1 {
+  font-size: 28px;
+  color: black;
+}
+
+h2 {
+  font-size: 24px;
+  border-bottom: 1px solid #cccccc;
+  color: black;
+}
+
+h3 {
+  font-size: 18px;
+}
+
+h4 {
+  font-size: 16px;
+}
+
+h5 {
+  font-size: 14px;
+}
+
+h6 {
+  color: #777777;
+  font-size: 14px;
+}
+
+p, blockquote, ul, ol, dl, li, table, pre {
+  margin: 15px 0;
+}
+
+/*
+hr {
+  border: 0 none;
+  color: #cccccc;
+  height: 4px;
+  padding: 0;
+}
+*/
+body &gt; h2:first-child {
+  margin-top: 0;
+  padding-top: 0;
+}
+
+body &gt; h1:first-child {
+  margin-top: 0;
+  padding-top: 0;
+}
+
+body &gt; h1:first-child + h2 {
+  margin-top: 0;
+  padding-top: 0;
+}
+
+body &gt; h3:first-child, body &gt; h4:first-child, body &gt; h5:first-child, body &gt; h6:first-child {
+  margin-top: 0;
+  padding-top: 0;
+}
+
+a:first-child h1, a:first-child h2, a:first-child h3, a:first-child h4, a:first-child h5, a:first-child h6 {
+  margin-top: 0;
+  padding-top: 0;
+}
+
+h1 p, h2 p, h3 p, h4 p, h5 p, h6 p {
+  margin-top: 0;
+}
+
+li p.first {
+  display: inline-block;
+}
+
+ul, ol {
+  padding-left: 30px;
+}
+
+ul :first-child, ol :first-child {
+  margin-top: 0;
+}
+
+ul :last-child, ol :last-child {
+  margin-bottom: 0;
+}
+
+dl {
+  padding: 0;
+}
+
+dl dt {
+  font-size: 14px;
+  font-weight: bold;
+  font-style: italic;
+  padding: 0;
+  margin: 15px 0 5px;
+}
+
+dl dt:first-child {
+  padding: 0;
+}
+
+dl dt &gt; :first-child {
+  margin-top: 0;
+}
+
+dl dt &gt; :last-child {
+  margin-bottom: 0;
+}
+
+dl dd {
+  margin: 0 0 15px;
+  padding: 0 15px;
+}
+
+dl dd &gt; :first-child {
+  margin-top: 0;
+}
+
+dl dd &gt; :last-child {
+  margin-bottom: 0;
+}
+
+blockquote {
+  border-left: 4px solid #dddddd;
+  padding: 0 15px;
+  color: #777777;
+}
+
+blockquote &gt; :first-child {
+  margin-top: 0;
+}
+
+blockquote &gt; :last-child {
+  margin-bottom: 0;
+}
+
+table {
+  padding: 0;
+}
+table tr {
+  border-top: 1px solid #cccccc;
+  background-color: white;
+  margin: 0;
+  padding: 0;
+}
+
+table tr:nth-child(2n) {
+  background-color: #f8f8f8;
+}
+
+table tr th {
+  font-weight: bold;
+  border: 1px solid #cccccc;
+  text-align: left;
+  margin: 0;
+  padding: 6px 13px;
+}
+
+table tr td {
+  border: 1px solid #cccccc;
+  text-align: left;
+  margin: 0;
+  padding: 6px 13px;
+}
+
+table tr th :first-child, table tr td :first-child {
+  margin-top: 0;
+}
+
+table tr th :last-child, table tr td :last-child {
+  margin-bottom: 0;
+}
+
+img {
+  max-width: 100%;
+}
+
+span.frame {
+  display: block;
+  overflow: hidden;
+}
+
+span.frame &gt; span {
+  border: 1px solid #dddddd;
+  display: block;
+  float: left;
+  overflow: hidden;
+  margin: 13px 0 0;
+  padding: 7px;
+  width: auto;
+}
+
+span.frame span img {
+  display: block;
+  float: left;
+}
+
+span.frame span span {
+  clear: both;
+  color: #333333;
+  display: block;
+  padding: 5px 0 0;
+}
+
+span.align-center {
+  display: block;
+  overflow: hidden;
+  clear: both;
+}
+
+span.align-center &gt; span {
+  display: block;
+  overflow: hidden;
+  margin: 13px auto 0;
+  text-align: center;
+}
+
+span.align-center span img {
+  margin: 0 auto;
+  text-align: center;
+}
+
+span.align-right {
+  display: block;
+  overflow: hidden;
+  clear: both;
+}
+
+span.align-right &gt; span {
+  display: block;
+  overflow: hidden;
+  margin: 13px 0 0;
+  text-align: right;
+}
+
+span.align-right span img {
+  margin: 0;
+  text-align: right;
+}
+
+span.float-left {
+  display: block;
+  margin-right: 13px;
+  overflow: hidden;
+  float: left;
+}
+
+span.float-left span {
+  margin: 13px 0 0;
+}
+
+span.float-right {
+  display: block;
+  margin-left: 13px;
+  overflow: hidden;
+  float: right;
+}
+
+span.float-right &gt; span {
+  display: block;
+  overflow: hidden;
+  margin: 13px auto 0;
+  text-align: right;
+}
+
+code, tt {
+  margin: 0 2px;
+  padding: 0 5px;
+  white-space: nowrap;
+  border: 1px solid #eaeaea;
+  background-color: #f8f8f8;
+  border-radius: 3px;
+}
+
+pre code {
+  margin: 0;
+  padding: 0;
+  white-space: pre;
+  border: none;
+  background: transparent;
+}
+
+.highlight pre {
+  background-color: #f8f8f8;
+  border: 1px solid #cccccc;
+  font-size: 13px;
+  line-height: 19px;
+  overflow: auto;
+  padding: 6px 10px;
+  border-radius: 3px;
+}
+
+pre {
+  background-color: #f8f8f8;
+  border: 1px solid #cccccc;
+  font-size: 13px;
+  line-height: 19px;
+  overflow: auto;
+  padding: 6px 10px;
+  border-radius: 3px;
+}
+
+pre code, pre tt {
+  background-color: transparent;
+  border: none;
+}
+
+/* Syntax Highlighting */
+
+.plainText {
+ background-color: #FFFFFF;
+ color: #000000;
+}
+.htmlServerSideScript {
+ background-color: #FFFF00;
+}
+.htmlComment {
+ color: #008000;
+}
+.htmlTagDelimiter {
+ color: #0000FF;
+}
+.htmlElementName {
+ color: #A31515;
+}
+.htmlAttributeName {
+ color: #FF0000;
+}
+.htmlAttributeValue {
+ color: #0000FF;
+}
+.htmlOperator {
+ color: #0000FF;
+}
+.comment {
+ color: #008000;
+}
+.xmlDocTag {
+ color: #808080;
+}
+.xmlDocComment {
+ color: #008000;
+}
+.string {
+ color: #A31515;
+}
+.stringCSharpVerbatim {
+ color: #A31515;
+}
+.keyword {
+ color: #0000FF;
+}
+.preprocessorKeyword {
+ color: #0000FF;
+}
+.htmlEntity {
+ color: #FF0000;
+}
+.xmlAttribute {
+ color: #FF0000;
+}
+.xmlAttributeQuotes {
+ color: #000000;
+}
+.xmlAttributeValue {
+ color: #0000FF;
+}
+.xmlCDataSection {
+ color: #808080;
+}
+.xmlComment {
+ color: #008000;
+}
+.xmlDelimiter {
+ color: #0000FF;
+}
+.xmlName {
+ color: #A31515;
+}
+.className {
+ color: #48D1CC;
+}
+.cssSelector {
+ color: #A31515;
+}
+.cssPropertyName {
+ color: #FF0000;
+}
+.cssPropertyValue {
+ color: #0000FF;
+}
+.sqlSystemFunction {
+ color: #FF00FF;
+}
+.powershellAttribute {
+ color: #B0E0E6;
+}
+.powershellOperator {
+ color: #808080;
+}
+.powershellType {
+ color: #008080;
+}
+.powershellVariable {
+ color: #FF4500;
+}
+.type {
+ color: #008080;
+}
+.typeVariable {
+ color: #008080;
+ font-style: italic;
+}
+.namespace {
+ color: #000080;
+}
+.constructor {
+ color: #800080;
+}
+.predefined {
+ color: #000080;
+}
+.pseudoKeyword {
+ color: #000080;
+}
+.stringEscape {
+ color: #808080;
+}
+.controlKeyword {
+ color: #0000FF;
+}
+.number {
+}
+.operator {
+}
+.delimiter {
+}
+.markdownHeader {
+ font-weight: bold;
+}
+.markdownCode {
+ color: #008080;
+}
+.markdownListItem {
+ font-weight: bold;
+}
+.italic {
+ font-style: italic;
+}
+.bold {
+ font-weight: bold;
+}
+
+                    </style>
+                </head>
+                <body style="">
+                <h1 id="0">DA Poly Paint for Unity</h1>
+<ul id="2">
+<li id="2"><a href="#introduction">Introduction</a></li>
+<li id="3"><a href="#installation">Installation</a></li>
+<li id="4"><a href="#using-da-poly-paint">Using DA Poly Paint</a></li>
+<li id="5"><a href="#tool-action-paint-select">Tool Action: Paint | Select</a></li>
+<li id="6"><a href="#save-and-save-as">Save and Save as...</a></li>
+<li id="7"><a href="#export-obj-import-obj">Export OBJ/ Import OBJ</a></li>
+<li id="8"><a href="#requirements-and-compatibility">Requirements and Compatibility</a></li>
+<li id="9"><a href="#keyboard-shortcuts">Keyboard Shortcuts</a></li>
+<li id="10"><a href="#additional-notes">Additional Notes</a></li>
+</ul>
+<h2 id="12">Introduction <a name="introduction"></a></h2>
+<p id="14"><a href="https://www.youtube.com/watch?v=wEDbnaEky0Y"><img src="docs%7E/daPolyPaint_820px.png" alt="Youtube Video" /><em>Watch YouTube Video</em></a></p>
+<p id="16">DA Poly Paint is an easy-to-use Polygon Painting tool for Unity, offering an alternative to <a href="https://github.com/piXelicidio/pxMaxScript/tree/master/PolyPainter">pX Poly Paint for 3ds Max</a>. It lets you customize low-poly models directly in the Unity Editor without UV mapping, using the diffuse texture as a color palette.</p>
+<h2 id="18">Installation from the Unity Store</h2>
+<p id="20">Get it here: <a href="https://assetstore.unity.com/packages/tools/painting/da-polypaint-low-poly-customizer-251157">DA PolyPaint - Atlas Color Mapper</a></p>
+<h2 id="22">Installation (from GitHub) <a name="installation"></a></h2>
+<ol id="24">
+<li id="24">Download or clone the code from the GitHub repo: <a href="https://github.com/piXelicidio/DAPolyPaint">https://github.com/piXelicidio/DAPolyPaint</a></li>
+<li id="25">Place the downloaded code anywhere inside your Unity project assets.</li>
+</ol>
+<h2 id="27">Using DA Poly Paint <a name="using-da-poly-paint"></a></h2>
+<h3 id="28">Getting Started</h3>
+<ol id="29">
+<li id="29">Access the tool via the Unity Main Menu: <strong>Tools</strong> &gt; <strong>DA</strong> &gt; <strong>Poly Paint</strong></li>
+<li id="30">Select any mesh object in the scene.</li>
+<li id="31">Click <strong>'START PAINTING'</strong> in the DA Poly Paint window.</li>
+<li id="32">Select a color by clicking the texture palette box.</li>
+<li id="33">Click and drag over the surface of your model to start painting with the default tool: Brush.</li>
+</ol>
+<h2 id="35">Painting</h2>
+<h3 id="37">Brush</h3>
+<p id="38"><img src="docs%7E/using_brush.gif" alt="Using Brush" /></p>
+<p id="40">Paint individual triangles (Or quads if auto-detect quad is activated).</p>
+<h3 id="42">Fill (Ctrl)</h3>
+<p id="43"><img src="docs%7E/using_fill.gif" alt="Using Fill" /></p>
+<p id="45">Paint areas with the following modes:</p>
+<ol id="46">
+<li id="46">Flood: Fill continuous areas of the same color.</li>
+<li id="47">Replace: Replace all occurrences of the color for the whole model.</li>
+<li id="48">Element: Applies paint to a mesh section. All connected faces.</li>
+<li id="49">All: Full repaint the entire model.</li>
+</ol>
+<h3 id="51">Loop (Ctrl+Shift)</h3>
+<p id="52"><img src="docs%7E/using_loop.gif" alt="Using Loop" /></p>
+<p id="54">Paint along quad loops. Uncheck &quot;Two Ways&quot; if you want the stroke to go only in the direction of the mouse drag. Note that loop only works if the cursor is over a detected quad, and the mouse drag should cross one of its edges.</p>
+<h3 id="56">Pick (Shift)</h3>
+<p id="57">This allows you to sample colors directly from the 3D object surface.</p>
+<h3 id="59">Mirror Cursor Axis</h3>
+<p id="60"><img src="docs%7E/using_mirror.gif" alt="Using Mirror" /></p>
+<p id="62">Mirrors the current tool cursor along a selected axis.</p>
+<h2 id="64">Tool Action: Paint | Select <a name="tool-action-paint-select"></a></h2>
+<h3 id="66">Paint</h3>
+<p id="67">All strokes, fills and loops works as expected, they paint the polygons with the selected color.</p>
+<h3 id="69">Select</h3>
+<p id="70">On selection mode the tools above will select faces instead of painting it. The selection is highlighted by drawing the faces with orange polylines or shaded faces. Then selection commands can be used.</p>
+<p id="72">When in select mode the keyboard state keys will behave as the standard in many other applications:</p>
+<ul id="74">
+<li id="74"><strong>Ctrl</strong> - Add to selection.</li>
+<li id="75"><strong>Shift</strong> - Subtracts from selection.</li>
+<li id="76"><strong>None</strong> - Replace selection.</li>
+</ul>
+<h3 id="78">Selection commands</h3>
+<ul id="79">
+<li id="79"><strong>Clear selection:</strong> Clear any selected faces.</li>
+<li id="80"><strong>Shade selected:</strong> Use shaded polygons vs polylines to highlight the selected faces.</li>
+<li id="81"><strong>Restrict painting to selected:</strong> When checked, any paint strokes would be restricted to the selected faces.</li>
+<li id="82"><strong>Move faces away -X +X:</strong> This temporally detach and move the selected faces away in the X axis. Useful when you want to paint areas of the model that are occluded by other parts of itself.</li>
+<li id="83"><strong>Move All Back:</strong> Restore any detached and moved faces.</li>
+</ul>
+<h2 id="85">Undo (Ctrl+Z) / Redo (Ctrl+Y)</h2>
+<p id="86">Undo and Redo available as buttons. <strong>Note</strong> that Undo/Redo is currently only available for paint operations.</p>
+<h2 id="88">Save and Save as... <a name="save-and-save-as"></a></h2>
+<p id="89">Saves the changes on the asset. DA PolyPaint works with UV channels. Any change to the mesh data is present only in memory unless saved to the asset.</p>
+<p id="91">Recently imported assets like FBX can't be directly overwritten,  therefore DA PolyPaint will ask you to save as a separated asset. Now on your prefab will reference to the new asset created. If later on you wish to restore your original mesh just restore back the reference to the mesh inside your FBX asset.</p>
+<h2 id="93">Export OBJ/ Import OBJ (EXPERIMENTAL) <a name="export-obj-import-obj"></a></h2>
+<p id="94">This new handy feature allows you to quickly export and re-import the mesh for the purpose of quick tweaks with external applications, bypassing Unity's built-in import system.</p>
+<p id="96">Intended for minor modifications of the mesh outside Unity, then import the result back directly to the tool to keep the painting process on the same asset without breaking any references.</p>
+<p id="98">NOTE: Skinned meshes not supported yet for Export/Import OBJ.</p>
+<h2 id="101">Utilities</h2>
+<h3 id="102">Remap To Texture</h3>
+<p id="103">Easily switch between color palettes without disrupting your model look. This feature analyzes a new texture and reassigns UVs to the most similar colors, allowing for seamless transitions between palettes and optimization across multiple models. Ideal for texture consolidation.</p>
+<h2 id="105">Requirements and Compatibility <a name="requirements-and-compatibility"></a></h2>
+<ul id="106">
+<li id="106">A mesh with a Mesh Filter or Skinned Mesh Renderer component.</li>
+<li id="107">A material with a diffuse texture assigned. (This will act as palette color)</li>
+</ul>
+<h2 id="109">Keyboard Shortcuts <a name="keyboard-shortcuts"></a></h2>
+<table id="111">
+<thead>
+<tr id="111">
+<th id="111">shortcut</th>
+<th id="111">Tool Action: Paint</th>
+<th id="111">Tool Action: Select</th>
+</tr>
+</thead>
+<tbody>
+<tr id="113">
+<td id="113"><em>Ctrl</em></td>
+<td id="113">Fill</td>
+<td id="113">Add to selection</td>
+</tr>
+<tr id="114">
+<td id="114"><em>Ctrl + Shift</em></td>
+<td id="114">Loop</td>
+<td id="114"></td>
+</tr>
+<tr id="115">
+<td id="115"><em>Shift</em></td>
+<td id="115">Pick</td>
+<td id="115">Subtract from selection</td>
+</tr>
+<tr id="116">
+<td id="116"><em>None</em></td>
+<td id="116">Brush</td>
+<td id="116">Replace selection</td>
+</tr>
+</tbody>
+</table>
+<h2 id="120">Additional Notes <a name="additional-notes"></a></h2>
+<ul id="121">
+<li id="121">When the selection changes, the DA Poly Paint window will indicate if it is ready for painting.</li>
+<li id="122"><strong>WARNING!:</strong> After pressing <strong>START PAINT</strong>, the tool tries to constrain the focus to the selection. Trying to force a change in the currently selected object or using other editor features might conflict with DA Poly Paint. Always click <strong>END SESSION</strong> after finishing painting.</li>
+</ul>
+<h2 id="124">Fuel DA Poly Paint's Future 🚀 <a name="support-the-project"></a></h2>
+<p id="125">Digging DA PolyPaint? Keep the colors flowing by snagging my low-poly characters. You get awesome assets, and DA Poly Paint gets to grow - it's a win-win!</p>
+<p id="127">Check out: <a href="https://assetstore.unity.com/packages/3d/characters/city-people-mega-pack-203329">City People Mega-Pack</a></p>
+<p id="129">Your support helps paint a vibrant future for everyone. 🎨🌈</p>
+<h2 id="131">Help &amp; Support</h2>
+<p id="132">| <a href="https://github.com/piXelicidio/PolyChat/discussions/categories/scripted-tools">PolyChat forum</a> | <a href="mailto:denys.almaral@gmail.com">direct e-mail</a> |</p>
+
+                </body>
+            </html>
+            
